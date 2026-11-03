@@ -29,6 +29,14 @@ export interface LoginVO {
   role: string
   roleName: string
   avatar?: string
+  studentNo?: string
+  className?: string
+  department?: string
+  phone?: string
+  email?: string
+  gender?: number
+  status?: number
+  createTime?: string
 }
 
 // 通用响应

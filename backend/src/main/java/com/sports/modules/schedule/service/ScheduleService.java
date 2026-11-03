@@ -23,6 +23,21 @@ public interface ScheduleService extends IService<Schedule> {
     IPage<Schedule> pageSchedules(Integer current, Integer size, Long eventId, String matchDate);
 
     /**
+     * 创建赛程（含业务校验）
+     */
+    Long createSchedule(Schedule schedule);
+
+    /**
+     * 更新赛程（含业务校验）
+     */
+    void updateSchedule(Long id, Schedule schedule);
+
+    /**
+     * 删除赛程（存在成绩时禁止删除）
+     */
+    void deleteSchedule(Long id);
+
+    /**
      * 开始比赛
      */
     void startMatch(Long id);

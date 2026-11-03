@@ -13,7 +13,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="loadData">查询</el-button>
+          <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
         </el-form-item>
       </el-form>
@@ -23,7 +23,7 @@
         <el-col :span="6">
           <el-card shadow="hover" class="stat-card">
             <div class="stat-value">{{ statistics.totalEvents }}</div>
-            <div class="stat-label">参赛次数</div>
+            <div class="stat-label">参赛赛事数</div>
           </el-card>
         </el-col>
         <el-col :span="6">
@@ -48,21 +48,26 @@
 
       <!-- 数据表格 -->
       <el-table :data="tableData" v-loading="loading" border stripe>
-        <el-table-column prop="eventName" label="赛事名称" min-width="150" />
-        <el-table-column prop="sportItemName" label="运动项目" width="120" />
-        <el-table-column prop="score" label="成绩" width="100" />
+        <el-table-column prop="eventName" label="赛事名称" min-width="160" />
+        <el-table-column prop="sportItemName" label="运动项目" width="140" />
+        <el-table-column label="成绩" width="120">
+          <template #default="{ row }">{{ row.scoreText || row.score || '-' }}</template>
+        </el-table-column>
         <el-table-column prop="unit" label="单位" width="80" />
-        <el-table-column prop="ranking" label="名次" width="100">
+        <el-table-column prop="ranking" label="名次" width="110">
           <template #default="{ row }">
             <el-tag v-if="row.ranking === 1" type="warning" effect="dark">🥇 第1名</el-tag>
             <el-tag v-else-if="row.ranking === 2" effect="dark">🥈 第2名</el-tag>
             <el-tag v-else-if="row.ranking === 3" type="danger" effect="dark">🥉 第3名</el-tag>
-            <span v-else>第{{ row.ranking }}名</span>
+            <span v-else-if="row.ranking">第{{ row.ranking }}名</span>
+            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="points" label="积分" width="80" />
-        <el-table-column prop="recordTime" label="记录时间" width="160" />
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column prop="recordTime" label="记录时间" width="170">
+          <template #default="{ row }">{{ row.recordTime || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="110" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="handleViewEvent(row)">查看赛事</el-button>
           </template>
@@ -125,10 +130,14 @@ async function loadEventOptions() {
 async function loadData() {
   loading.value = true
   try {
-    const res = await get('/results/my', queryParams)
+    const res = await get('/results/my', {
+      current: queryParams.current,
+      size: queryParams.size,
+      eventId: queryParams.eventId || undefined
+    })
     if (res.code === 200) {
-      tableData.value = res.data.records
-      total.value = res.data.total
+      tableData.value = res.data.records || []
+      total.value = res.data.total || 0
     }
   } finally {
     loading.value = false
@@ -137,9 +146,14 @@ async function loadData() {
 
 async function loadStatistics() {
   const res = await get('/results/my/statistics')
-  if (res.code === 200) {
+  if (res.code === 200 && res.data) {
     Object.assign(statistics, res.data)
   }
+}
+
+function handleSearch() {
+  queryParams.current = 1
+  loadData()
 }
 
 function resetQuery() {

@@ -68,20 +68,97 @@
         </router-view>
       </el-main>
     </el-container>
+
+    <!-- 修改密码 -->
+    <el-dialog v-model="pwdVisible" title="修改密码" width="420px" @closed="resetPwdForm">
+      <el-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-width="90px">
+        <el-form-item label="原密码" prop="oldPassword">
+          <el-input v-model="pwdForm.oldPassword" type="password" show-password placeholder="请输入原密码" />
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input v-model="pwdForm.newPassword" type="password" show-password placeholder="6-20位新密码" />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input v-model="pwdForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="pwdVisible = false">取消</el-button>
+        <el-button type="primary" :loading="pwdLoading" @click="submitPwd">确定</el-button>
+      </template>
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import { post } from '@/utils/request'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
 const isCollapse = ref(false)
+
+const pwdVisible = ref(false)
+const pwdLoading = ref(false)
+const pwdFormRef = ref<FormInstance>()
+const pwdForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+const validateConfirm = (_rule: any, value: string, callback: Function) => {
+  if (value !== pwdForm.newPassword) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const pwdRules: FormRules = {
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度为6-20位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    { validator: validateConfirm, trigger: 'blur' }
+  ]
+}
+
+function resetPwdForm() {
+  pwdFormRef.value?.resetFields()
+  pwdForm.oldPassword = ''
+  pwdForm.newPassword = ''
+  pwdForm.confirmPassword = ''
+}
+
+async function submitPwd() {
+  if (!pwdFormRef.value) return
+  const valid = await pwdFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  pwdLoading.value = true
+  try {
+    await post('/auth/change-password', {
+      oldPassword: pwdForm.oldPassword,
+      newPassword: pwdForm.newPassword
+    })
+    ElMessage.success('密码修改成功，请重新登录')
+    pwdVisible.value = false
+    setTimeout(() => {
+      userStore.logout()
+      router.push('/login')
+    }, 800)
+  } finally {
+    pwdLoading.value = false
+  }
+}
 
 const activeMenu = computed(() => route.path)
 const currentRoute = computed(() => route)
@@ -109,7 +186,8 @@ function handleCommand(command: string) {
       router.push('/profile')
       break
     case 'password':
-      // TODO: 修改密码弹窗
+      resetPwdForm()
+      pwdVisible.value = true
       break
     case 'logout':
       ElMessageBox.confirm('确定要退出登录吗？', '提示', {
@@ -131,55 +209,115 @@ function handleCommand(command: string) {
 }
 
 .layout-aside {
-  background-color: #304156;
-  transition: width 0.3s;
+  background: var(--sidebar-bg);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  position: relative;
+  
+  // 侧边栏光效装饰
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+  }
 
   .logo {
-    height: 60px;
+    height: var(--header-height);
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #263445;
-
+    padding: 0 16px;
+    gap: 12px;
+    
     .logo-img {
-      width: 32px;
-      height: 32px;
+      width: 40px;
+      height: 40px;
+      flex-shrink: 0;
+      filter: drop-shadow(0 2px 8px rgba(124, 58, 237, 0.4));
     }
 
     .logo-text {
-      margin-left: 10px;
       color: #fff;
-      font-size: 16px;
-      font-weight: bold;
+      font-size: 17px;
+      font-weight: 700;
       white-space: nowrap;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #ffffff 0%, #c4b5fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
   }
 
   .el-menu {
-    border-right: none;
+    border-right: none !important;
+    padding: 8px 0;
+    background: transparent !important;
+    
+    .el-menu-item {
+      color: rgba(255, 255, 255, 0.75) !important;
+      height: 46px !important;
+      line-height: 46px !important;
+      font-weight: 500;
+      
+      & .el-icon {
+        color: rgba(255, 255, 255, 0.7) !important;
+        font-size: 18px;
+      }
+      
+      &.is-active {
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.95) 0%, rgba(124, 58, 237, 0.95) 100%) !important;
+        color: #fff !important;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+        
+        & .el-icon {
+          color: #fff !important;
+        }
+      }
+      
+      &:hover:not(.is-active) {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        color: #fff !important;
+        
+        & .el-icon {
+          color: rgba(255, 255, 255, 0.9) !important;
+        }
+      }
+    }
   }
 }
 
 .layout-header {
-  background-color: #fff;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding: 0 24px;
+  height: var(--header-height);
 
   .header-left {
     display: flex;
     align-items: center;
 
     .collapse-btn {
-      font-size: 20px;
+      font-size: 22px;
       cursor: pointer;
-      margin-right: 20px;
+      margin-right: 24px;
+      color: var(--text-secondary);
+      padding: 8px;
+      border-radius: var(--radius-md);
+      transition: all 0.25s ease;
 
       &:hover {
-        color: #409eff;
+        color: var(--primary);
+        background: var(--primary-bg);
       }
     }
   }
@@ -189,26 +327,37 @@ function handleCommand(command: string) {
       display: flex;
       align-items: center;
       cursor: pointer;
+      padding: 6px 14px 6px 6px;
+      border-radius: 999px;
+      transition: all 0.25s ease;
+      
+      &:hover {
+        background: var(--bg-hover);
+      }
 
       .username {
-        margin: 0 8px;
+        margin: 0 10px;
+        font-weight: 500;
+        color: var(--text-primary);
       }
     }
   }
 }
 
 .layout-main {
-  background-color: #f5f7fa;
-  padding: 20px;
+  background: linear-gradient(180deg, var(--bg-page) 0%, #E2E8F0 100%);
+  padding: 24px;
+  overflow-y: auto;
 }
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+  transform: translateY(8px);
 }
 </style>

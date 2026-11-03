@@ -29,8 +29,16 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="eventName" label="所属赛事" min-width="150" />
         <el-table-column prop="name" label="项目名称" width="150" />
-        <el-table-column prop="categoryName" label="类别" width="100" />
-        <el-table-column prop="genderLimitName" label="性别限制" width="100" />
+        <el-table-column label="类别" width="110">
+          <template #default="{ row }">{{ typeName(row.type) }}</template>
+        </el-table-column>
+        <el-table-column label="性别限制" width="100">
+          <template #default="{ row }">{{ genderName(row.genderLimit) }}</template>
+        </el-table-column>
+        <el-table-column label="成绩类型" width="110">
+          <template #default="{ row }">{{ scoreTypeName(row.scoreType) }}</template>
+        </el-table-column>
+        <el-table-column prop="scoreUnit" label="单位" width="80" />
         <el-table-column prop="maxParticipants" label="人数上限" width="100" />
         <el-table-column prop="currentParticipants" label="已报名" width="100" />
         <el-table-column prop="rules" label="比赛规则" min-width="200" show-overflow-tooltip />
@@ -85,6 +93,22 @@
         <el-form-item label="人数上限" prop="maxParticipants">
           <el-input-number v-model="formData.maxParticipants" :min="1" :max="1000" />
         </el-form-item>
+        <el-form-item label="成绩类型" prop="scoreType">
+          <el-select v-model="formData.scoreType" placeholder="请选择">
+            <el-option label="时间（计时）" value="TIME" />
+            <el-option label="距离（计远）" value="DISTANCE" />
+            <el-option label="分数（计分）" value="SCORE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="成绩单位" prop="scoreUnit">
+          <el-input v-model="formData.scoreUnit" placeholder="如：秒、米、分" />
+        </el-form-item>
+        <el-form-item label="排序规则" prop="sortRule">
+          <el-radio-group v-model="formData.sortRule">
+            <el-radio value="ASC">升序（时间越短越好）</el-radio>
+            <el-radio value="DESC">降序（数值越大越好）</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="比赛规则" prop="rules">
           <el-input v-model="formData.rules" type="textarea" :rows="3" placeholder="请输入比赛规则" />
         </el-form-item>
@@ -126,6 +150,9 @@ const formData = reactive({
   type: 'TRACK',
   genderLimit: 0,
   maxParticipants: 100,
+  scoreType: 'TIME',
+  scoreUnit: '秒',
+  sortRule: 'ASC',
   rules: ''
 })
 
@@ -172,7 +199,8 @@ function handleAdd() {
   dialogTitle.value = '新增项目'
   Object.assign(formData, {
     eventId: null, name: '', type: 'TRACK',
-    genderLimit: 0, maxParticipants: 100, rules: ''
+    genderLimit: 0, maxParticipants: 100,
+    scoreType: 'TIME', scoreUnit: '秒', sortRule: 'ASC', rules: ''
   })
   dialogVisible.value = true
 }
@@ -180,8 +208,35 @@ function handleAdd() {
 function handleEdit(row: any) {
   editingId.value = row.id
   dialogTitle.value = '编辑项目'
-  Object.assign(formData, row)
+  Object.assign(formData, {
+    eventId: row.eventId,
+    name: row.name,
+    type: row.type,
+    genderLimit: row.genderLimit ?? 0,
+    maxParticipants: row.maxParticipants ?? 0,
+    scoreType: row.scoreType || 'SCORE',
+    scoreUnit: row.scoreUnit || '',
+    sortRule: row.sortRule || 'DESC',
+    rules: row.rules || ''
+  })
   dialogVisible.value = true
+}
+
+function typeName(type: string) {
+  const map: Record<string, string> = {
+    TRACK: '径赛', FIELD: '田赛', BALL: '球类', WATER: '水上项目', SWIMMING: '游泳', OTHER: '其他'
+  }
+  return map[type] || type || '-'
+}
+
+function genderName(limit: number) {
+  const map: Record<number, string> = { 0: '不限', 1: '仅男', 2: '仅女' }
+  return map[limit] ?? '不限'
+}
+
+function scoreTypeName(type: string) {
+  const map: Record<string, string> = { TIME: '时间', DISTANCE: '距离', SCORE: '分数' }
+  return map[type] || '-'
 }
 
 async function handleSubmit() {

@@ -31,6 +31,11 @@ service.interceptors.request.use(
 // 响应拦截器
 service.interceptors.response.use(
   (response: AxiosResponse<Result>) => {
+    // 二进制响应（文件下载）直接返回，不做业务码校验
+    if (response.config?.responseType === 'blob') {
+      return response.data as any
+    }
+
     const res = response.data
 
     // 业务错误
@@ -97,6 +102,43 @@ export function put<T = any>(url: string, data?: any, config?: AxiosRequestConfi
 
 export function del<T = any>(url: string, config?: AxiosRequestConfig): Promise<Result<T>> {
   return service.delete(url, config)
+}
+
+/**
+ * 带登录态的二进制下载（导出 Excel 等）
+ */
+export async function download(url: string, params?: any, filename = 'download.xlsx'): Promise<void> {
+  const response = await service.get(url, { params, responseType: 'blob' })
+  // 后端异常时会返回 JSON，需要单独处理
+  const blob = response as unknown as Blob
+  if (blob.type && blob.type.includes('application/json')) {
+    const text = await blob.text()
+    try {
+      const json = JSON.parse(text)
+      ElMessage.error(json.message || '下载失败')
+    } catch {
+      ElMessage.error('下载失败')
+    }
+    return
+  }
+
+  const link = document.createElement('a')
+  const href = URL.createObjectURL(blob)
+  link.href = href
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(href)
+}
+
+/**
+ * 文件上传（multipart/form-data）
+ */
+export function upload<T = any>(url: string, formData: FormData): Promise<Result<T>> {
+  return service.post(url, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
 
 export default service

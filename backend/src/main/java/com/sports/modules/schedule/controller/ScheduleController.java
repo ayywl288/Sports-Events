@@ -2,14 +2,15 @@ package com.sports.modules.schedule.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.sports.common.exception.BusinessException;
+import com.sports.common.result.PageResult;
 import com.sports.common.result.Result;
 import com.sports.common.result.ResultCode;
 import com.sports.modules.schedule.entity.Schedule;
 import com.sports.modules.schedule.service.ScheduleService;
+import com.sports.modules.schedule.service.impl.ScheduleServiceImpl;
 import com.sports.modules.schedule.vo.ScheduleVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -29,46 +30,39 @@ public class ScheduleController {
 
     @Operation(summary = "分页查询赛程")
     @GetMapping
-    public Result<IPage<ScheduleVO>> pageSchedules(
+    public Result<PageResult<ScheduleVO>> pageSchedules(
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) Long eventId,
             @RequestParam(required = false) String matchDate) {
-        return Result.success(scheduleService.pageSchedulesVO(current, size, eventId, matchDate));
+        return Result.success(PageResult.of(scheduleService.pageSchedulesVO(current, size, eventId, matchDate)));
     }
 
     @Operation(summary = "获取赛程详情")
     @GetMapping("/{id}")
-    public Result<Schedule> getById(@PathVariable Long id) {
+    public Result<ScheduleVO> getById(@PathVariable Long id) {
         Schedule schedule = scheduleService.getById(id);
         if (schedule == null) {
             throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
         }
-        return Result.success(schedule);
+        ScheduleVO vo = new ScheduleVO();
+        org.springframework.beans.BeanUtils.copyProperties(schedule, vo);
+        vo.setStatusName(ScheduleServiceImpl.getStatusName(schedule.getStatus()));
+        return Result.success(vo);
     }
 
     @Operation(summary = "创建赛程")
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public Result<Long> create(@Valid @RequestBody Schedule schedule) {
-        // 设置默认状态
-        if (schedule.getStatus() == null) {
-            schedule.setStatus(1);
-        }
-        scheduleService.save(schedule);
-        return Result.success(schedule.getId());
+    public Result<Long> create(@RequestBody Schedule schedule) {
+        return Result.success("创建成功", scheduleService.createSchedule(schedule));
     }
 
     @Operation(summary = "更新赛程")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody Schedule schedule) {
-        Schedule existing = scheduleService.getById(id);
-        if (existing == null) {
-            throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
-        }
-        schedule.setId(id);
-        scheduleService.updateById(schedule);
+    public Result<Void> update(@PathVariable Long id, @RequestBody Schedule schedule) {
+        scheduleService.updateSchedule(id, schedule);
         return Result.success();
     }
 
@@ -76,11 +70,7 @@ public class ScheduleController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> delete(@PathVariable Long id) {
-        Schedule existing = scheduleService.getById(id);
-        if (existing == null) {
-            throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
-        }
-        scheduleService.removeById(id);
+        scheduleService.deleteSchedule(id);
         return Result.success();
     }
 
