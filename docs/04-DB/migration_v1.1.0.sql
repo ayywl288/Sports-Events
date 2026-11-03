@@ -67,12 +67,12 @@ INSERT INTO `sys_dict_data` (`dict_code`, `item_value`, `item_label`, `sort_orde
 ('event_status', '5', '已取消', 5, 1);
 
 -- ------------------------------------------------------------
--- 6. 【仅演示环境】重置演示账号密码为 123456
---    生产环境请务必删除或注释本段
--- ------------------------------------------------------------
-UPDATE `sys_user`
-SET `password` = '$2a$10$HgSUmDRaol7.LJfTyh3YceD7SQ.y8qrL5oQE.h5jnEP1aQMXhOaxm'
-WHERE `is_deleted` = 0;
+-- -- 6. 【仅演示环境】重置演示账号密码为 123456
+-- --    生产环境请务必删除或注释本段
+-- -- ------------------------------------------------------------
+-- UPDATE `sys_user`
+-- SET `password` = '$2a$10$HgSUmDRaol7.LJfTyh3YceD7SQ.y8qrL5oQE.h5jnEP1aQMXhOaxm'
+-- WHERE `is_deleted` = 0;
 
 -- ------------------------------------------------------------
 -- 7. 校验：查看当前状态分布，便于人工确认
