@@ -38,15 +38,15 @@
         <el-table-column prop="location" label="场地" width="150" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ getStatusName(row.status) }}</el-tag>
+            <el-tag :type="getStatusType(row.status)">{{ row.statusName || getStatusName(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="row.status !== 3" type="primary" link @click="handleEdit(row)">编辑</el-button>
             <el-button v-if="row.status === 1" type="success" link @click="handleStart(row)">开始</el-button>
             <el-button v-if="row.status === 2" type="warning" link @click="handleComplete(row)">完成</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status !== 2" type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -198,12 +198,13 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: number) {
-  const map: Record<number, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+function getStatusType(status: number): TagType {
+  const map: Record<number, TagType> = {
     1: 'info',      // 未开始
     2: 'primary',   // 进行中
-    3: 'success',   // 已结束
-    4: 'danger'     // 已取消
+    3: 'success'    // 已结束
   }
   return map[status] || 'info'
 }

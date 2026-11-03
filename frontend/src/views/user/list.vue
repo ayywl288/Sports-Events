@@ -204,8 +204,10 @@ function resetQuery() {
   loadData()
 }
 
-function getRoleType(role: string) {
-  const map: Record<string, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+function getRoleType(role: string): TagType {
+  const map: Record<string, TagType> = {
     ADMIN: 'danger',
     TEACHER: 'warning',
     STUDENT: 'primary'

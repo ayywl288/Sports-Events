@@ -88,6 +88,11 @@ public class ScheduleVO {
     private Integer status;
 
     /**
+     * 状态名称
+     */
+    private String statusName;
+
+    /**
      * 备注
      */
     private String remark;

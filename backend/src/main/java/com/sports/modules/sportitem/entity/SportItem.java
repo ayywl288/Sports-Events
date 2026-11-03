@@ -80,7 +80,19 @@ public class SportItem extends BaseEntity {
     private String scoreUnit;
 
     /**
+     * 排序规则（ASC-升序(时间) DESC-降序(分数/距离)）
+     */
+    @TableField("sort_rule")
+    private String sortRule;
+
+    /**
      * 状态（0-禁用 1-启用）
      */
     private Integer status;
+
+    /**
+     * 所属赛事名称（非数据库字段，列表展示用）
+     */
+    @TableField(exist = false)
+    private String eventName;
 }

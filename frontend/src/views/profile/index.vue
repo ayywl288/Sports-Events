@@ -47,8 +47,8 @@
             </el-form-item>
             <el-form-item label="性别" prop="gender">
               <el-radio-group v-model="formData.gender">
-                <el-radio value="MALE">男</el-radio>
-                <el-radio value="FEMALE">女</el-radio>
+                <el-radio :value="1">男</el-radio>
+                <el-radio :value="2">女</el-radio>
               </el-radio-group>
             </el-form-item>
             <el-form-item>
@@ -91,7 +91,7 @@ import { get, put, post } from '@/utils/request'
 const userStore = useUserStore()
 const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
 
-const userInfo = computed(() => userStore.userInfo || {})
+const userInfo = computed<any>(() => userStore.userInfo || {})
 
 const formRef = ref<FormInstance>()
 const submitLoading = ref(false)
@@ -101,7 +101,7 @@ const formData = reactive({
   phone: '',
   email: '',
   department: '',
-  gender: ''
+  gender: 0
 })
 
 const rules: FormRules = {
@@ -121,7 +121,7 @@ const passwordForm = reactive({
   confirmPassword: ''
 })
 
-const validateConfirmPassword = (rule: any, value: string, callback: Function) => {
+const validateConfirmPassword = (_rule: any, value: string, callback: Function) => {
   if (value !== passwordForm.newPassword) {
     callback(new Error('两次输入的密码不一致'))
   } else {
@@ -155,13 +155,15 @@ async function loadUserInfo() {
       phone: res.data.phone || '',
       email: res.data.email || '',
       department: res.data.department || '',
-      gender: res.data.gender || ''
+      gender: res.data.gender ?? 0
     })
   }
 }
 
-function getRoleType(role: string) {
-  const map: Record<string, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+function getRoleType(role: string): TagType {
+  const map: Record<string, TagType> = {
     ADMIN: 'danger',
     TEACHER: 'warning',
     STUDENT: 'primary'
@@ -175,7 +177,10 @@ async function handleSubmit() {
     if (!valid) return
     submitLoading.value = true
     try {
-      await put('/auth/profile', formData)
+      const res = await put('/auth/profile', formData)
+      if (res.code === 200 && res.data) {
+        userStore.setUserInfo({ ...userStore.userInfo, ...res.data })
+      }
       ElMessage.success('保存成功')
       loadUserInfo()
     } finally {

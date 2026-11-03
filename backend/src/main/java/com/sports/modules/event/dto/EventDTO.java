@@ -76,6 +76,12 @@ public class EventDTO {
     private String organizer;
 
     /**
+     * 联系人
+     */
+    @Size(max = 50, message = "联系人最多50个字符")
+    private String contactPerson;
+
+    /**
      * 联系电话
      */
     @Size(max = 20, message = "联系电话最多20个字符")

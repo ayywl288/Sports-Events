@@ -94,7 +94,7 @@ CREATE TABLE `event` (
     `organizer` VARCHAR(100) DEFAULT NULL COMMENT '主办方',
     `contact_person` VARCHAR(50) DEFAULT NULL COMMENT '联系人',
     `contact_phone` VARCHAR(20) DEFAULT NULL COMMENT '联系电话',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1-草稿 2-报名中 3-进行中 4-已结束',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1-草稿 2-报名中 3-进行中 4-已结束 5-已取消',
     `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除: 0-否 1-是',
     `create_by` BIGINT DEFAULT NULL COMMENT '创建人ID',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -115,6 +115,7 @@ CREATE TABLE `sport_item` (
     `item_type` VARCHAR(50) DEFAULT NULL COMMENT '项目类型(字典: item_type)',
     `gender_limit` TINYINT DEFAULT 0 COMMENT '性别限制: 0-不限 1-仅男 2-仅女',
     `max_participants` INT DEFAULT 0 COMMENT '最大参赛人数(0表示不限)',
+    `current_participants` INT NOT NULL DEFAULT 0 COMMENT '已通过审核的报名人数',
     `result_type` VARCHAR(20) DEFAULT 'SCORE' COMMENT '成绩类型: TIME-时间 DISTANCE-距离 SCORE-分数',
     `result_unit` VARCHAR(20) DEFAULT NULL COMMENT '成绩单位(秒/米/分)',
     `sort_rule` VARCHAR(10) DEFAULT 'DESC' COMMENT '排序规则: ASC-升序(时间) DESC-降序(分数/距离)',
@@ -237,7 +238,7 @@ CREATE TABLE `news` (
     `is_top` TINYINT NOT NULL DEFAULT 0 COMMENT '是否置顶: 0-否 1-是',
     `view_count` INT NOT NULL DEFAULT 0 COMMENT '浏览次数',
     `publish_time` DATETIME DEFAULT NULL COMMENT '发布时间',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 0-草稿 1-已发布',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态: 0-草稿 1-已发布 2-已下架',
     `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除: 0-否 1-是',
     `create_by` BIGINT DEFAULT NULL COMMENT '创建人ID',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -256,7 +257,7 @@ CREATE TABLE `news` (
 
 -- 7.1 初始化管理员账号 (密码: admin123, BCrypt加密)
 INSERT INTO `sys_user` (`username`, `password`, `real_name`, `role`, `status`) VALUES
-('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', '系统管理员', 'ADMIN', 1);
+('admin', '$2a$10$HgSUmDRaol7.LJfTyh3YceD7SQ.y8qrL5oQE.h5jnEP1aQMXhOaxm', '系统管理员', 'ADMIN', 1);
 
 -- 7.2 初始化字典类型
 INSERT INTO `sys_dict_type` (`dict_code`, `dict_name`, `remark`) VALUES
@@ -272,11 +273,8 @@ INSERT INTO `sys_dict_type` (`dict_code`, `dict_name`, `remark`) VALUES
 -- 赛事类型
 INSERT INTO `sys_dict_data` (`dict_code`, `item_value`, `item_label`, `sort_order`) VALUES
 ('event_type', 'TRACK_FIELD', '田径运动会', 1),
-('event_type', 'BASKETBALL', '篮球联赛', 2),
-('event_type', 'FOOTBALL', '足球联赛', 3),
-('event_type', 'BADMINTON', '羽毛球比赛', 4),
-('event_type', 'TABLE_TENNIS', '乒乓球比赛', 5),
-('event_type', 'SWIMMING', '游泳比赛', 6),
+('event_type', 'BALL', '球类联赛', 2),
+('event_type', 'SWIMMING', '游泳比赛', 3),
 ('event_type', 'OTHER', '其他', 99);
 
 -- 赛事状态
@@ -284,7 +282,8 @@ INSERT INTO `sys_dict_data` (`dict_code`, `item_value`, `item_label`, `sort_orde
 ('event_status', '1', '草稿', 1),
 ('event_status', '2', '报名中', 2),
 ('event_status', '3', '进行中', 3),
-('event_status', '4', '已结束', 4);
+('event_status', '4', '已结束', 4),
+('event_status', '5', '已取消', 5);
 
 -- 项目类型
 INSERT INTO `sys_dict_data` (`dict_code`, `item_value`, `item_label`, `sort_order`) VALUES
@@ -326,10 +325,10 @@ INSERT INTO `sys_dict_data` (`dict_code`, `item_value`, `item_label`, `sort_orde
 
 -- 8.1 测试用户
 INSERT INTO `sys_user` (`username`, `password`, `real_name`, `gender`, `role`, `student_no`, `department`, `class_name`, `status`) VALUES
-('teacher01', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', '张老师', 1, 'TEACHER', NULL, '体育部', NULL, 1),
-('student01', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', '李明', 1, 'STUDENT', '2021001001', '计算机学院', '计算机2101班', 1),
-('student02', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', '王芳', 2, 'STUDENT', '2021001002', '计算机学院', '计算机2101班', 1),
-('student03', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', '张伟', 1, 'STUDENT', '2021002001', '电子学院', '电子2101班', 1);
+('teacher01', '$2a$10$HgSUmDRaol7.LJfTyh3YceD7SQ.y8qrL5oQE.h5jnEP1aQMXhOaxm', '张老师', 1, 'TEACHER', NULL, '体育部', NULL, 1),
+('student01', '$2a$10$HgSUmDRaol7.LJfTyh3YceD7SQ.y8qrL5oQE.h5jnEP1aQMXhOaxm', '李明', 1, 'STUDENT', '2021001001', '计算机学院', '计算机2101班', 1),
+('student02', '$2a$10$HgSUmDRaol7.LJfTyh3YceD7SQ.y8qrL5oQE.h5jnEP1aQMXhOaxm', '王芳', 2, 'STUDENT', '2021001002', '计算机学院', '计算机2101班', 1),
+('student03', '$2a$10$HgSUmDRaol7.LJfTyh3YceD7SQ.y8qrL5oQE.h5jnEP1aQMXhOaxm', '张伟', 1, 'STUDENT', '2021002001', '电子学院', '电子2101班', 1);
 
 -- 8.2 测试赛事
 INSERT INTO `event` (`event_name`, `event_type`, `description`, `start_date`, `end_date`, `reg_start_date`, `reg_end_date`, `location`, `organizer`, `contact_person`, `status`, `create_by`) VALUES

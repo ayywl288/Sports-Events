@@ -8,12 +8,10 @@
         </el-form-item>
         <el-form-item label="类型">
           <el-select v-model="queryParams.type" placeholder="请选择" clearable>
-            <el-option label="公告" value="ANNOUNCEMENT" />
-            <el-option label="新闻" value="NEWS" />
-            <el-option label="通知" value="NOTICE" />
+            <el-option v-for="item in TYPE_OPTIONS" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态">
+        <el-form-item label="状态" v-if="isAdmin">
           <el-select v-model="queryParams.status" placeholder="请选择" clearable>
             <el-option label="草稿" :value="0" />
             <el-option label="已发布" :value="1" />
@@ -85,9 +83,7 @@
         </el-form-item>
         <el-form-item label="类型" prop="type">
           <el-select v-model="formData.type" placeholder="请选择">
-            <el-option label="公告" value="ANNOUNCEMENT" />
-            <el-option label="新闻" value="NEWS" />
-            <el-option label="通知" value="NOTICE" />
+            <el-option v-for="item in TYPE_OPTIONS" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="关联赛事" prop="eventId">
@@ -130,6 +126,13 @@ import { useUserStore } from '@/stores/user'
 import { get, post, put, del } from '@/utils/request'
 
 const userStore = useUserStore()
+
+const TYPE_OPTIONS = [
+  { label: '赛事通知', value: 'NOTICE' },
+  { label: '成绩公告', value: 'RESULT' },
+  { label: '规则说明', value: 'RULE' },
+  { label: '其他', value: 'OTHER' }
+]
 
 const isAdmin = computed(() => userStore.userInfo?.role === 'ADMIN')
 
@@ -202,17 +205,20 @@ function resetQuery() {
   loadData()
 }
 
-function getTypeTagType(type: string) {
-  const map: Record<string, string> = {
-    ANNOUNCEMENT: 'danger',
-    NEWS: 'primary',
-    NOTICE: 'warning'
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+function getTypeTagType(type: string): TagType {
+  const map: Record<string, TagType> = {
+    NOTICE: 'warning',
+    RESULT: 'success',
+    RULE: 'primary',
+    OTHER: 'info'
   }
   return map[type] || 'info'
 }
 
-function getStatusType(status: number) {
-  const map: Record<number, string> = {
+function getStatusType(status: number): TagType {
+  const map: Record<number, TagType> = {
     0: 'info',      // 草稿
     1: 'success',   // 已发布
     2: 'warning'    // 已下架
@@ -224,7 +230,7 @@ function handleAdd() {
   editingId.value = null
   dialogTitle.value = '发布资讯'
   Object.assign(formData, {
-    title: '', type: '', eventId: null, content: '', isTop: 0
+    title: '', type: 'NOTICE', eventId: null, content: '', isTop: 0
   })
   dialogVisible.value = true
 }
@@ -232,7 +238,13 @@ function handleAdd() {
 function handleEdit(row: any) {
   editingId.value = row.id
   dialogTitle.value = '编辑资讯'
-  Object.assign(formData, row)
+  Object.assign(formData, {
+    title: row.title,
+    type: row.type,
+    eventId: row.eventId ?? null,
+    content: row.content,
+    isTop: row.isTop ?? 0
+  })
   dialogVisible.value = true
 }
 

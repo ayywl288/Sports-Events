@@ -23,14 +23,31 @@ public class RegistrationVO {
     private String realName;
     private String studentNo;
     private String college;
-    private String status;
+    private String phone;
+
+    /**
+     * 状态（1-待审核 2-已通过 3-已拒绝 4-已取消）
+     */
+    private Integer status;
+
+    /**
+     * 状态名称
+     */
     private String statusName;
+
     private Long reviewerId;
     private String reviewerName;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime reviewTime;
+
+    /**
+     * 审核意见 / 拒绝原因
+     */
     private String reviewRemark;
+
     private String remark;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 }

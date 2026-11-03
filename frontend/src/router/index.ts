@@ -25,12 +25,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/index.vue'),
         meta: { title: '首页', icon: 'HomeFilled' }
       },
-      // 赛事管理
+      // 赛事中心（学生也可浏览，管理按钮按角色隐藏）
       {
         path: 'events',
         name: 'Events',
         component: () => import('@/views/event/list.vue'),
-        meta: { title: '赛事管理', icon: 'Trophy', roles: ['ADMIN', 'TEACHER'] }
+        meta: { title: '赛事中心', icon: 'Trophy' }
       },
       {
         path: 'events/:id',
@@ -122,7 +122,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   // 设置页面标题
   document.title = `${to.meta.title || '校园体育赛事管理系统'} - 校园体育赛事管理系统`
 
@@ -139,6 +139,17 @@ router.beforeEach((to, from, next) => {
   if (!token) {
     next({ path: '/login', query: { redirect: to.fullPath } })
     return
+  }
+
+  // 刷新后内存中的用户信息会丢失，先从后端补齐，避免菜单与权限判断失效
+  if (!userStore.userInfo) {
+    try {
+      await userStore.fetchUserInfo()
+    } catch {
+      userStore.logout()
+      next({ path: '/login', query: { redirect: to.fullPath } })
+      return
+    }
   }
 
   // 检查角色权限

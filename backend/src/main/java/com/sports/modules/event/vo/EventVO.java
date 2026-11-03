@@ -74,6 +74,11 @@ public class EventVO {
     private String organizer;
 
     /**
+     * 联系人
+     */
+    private String contactPerson;
+
+    /**
      * 联系电话
      */
     private String contactPhone;
@@ -84,7 +89,7 @@ public class EventVO {
     private String coverImage;
 
     /**
-     * 状态 (1-草稿 2-报名中 3-进行中 4-已结束)
+     * 状态 (1-草稿 2-报名中 3-进行中 4-已结束 5-已取消)
      */
     private Integer status;
 
@@ -92,6 +97,11 @@ public class EventVO {
      * 状态名称
      */
     private String statusName;
+
+    /**
+     * 当前是否处于可报名窗口
+     */
+    private Boolean regOpen;
 
     /**
      * 报名人数
