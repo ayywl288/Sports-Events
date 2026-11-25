@@ -63,12 +63,6 @@ try {
         throw '服务启动失败。请查看上方错误，或在项目目录运行 docker compose logs。'
     }
 
-    Write-Host '正在检查旧版示例数据...'
-    & $dockerExe compose exec -T db sh /opt/sports-events/demo-repair/repair.sh
-    if ($LASTEXITCODE -ne 0) {
-        throw '旧版示例数据修复失败。请查看上方错误。'
-    }
-
     $binding = & $dockerExe compose port frontend 80
     if ($LASTEXITCODE -ne 0 -or $binding -notmatch '^127\.0\.0\.1:[0-9]+$') {
         throw '无法读取前端访问地址。请在项目目录运行 docker compose ps 查看端口。'

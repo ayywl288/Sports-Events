@@ -24,19 +24,10 @@ docker compose up -d --build --wait
 
 - 停止时双击 [停止系统.bat](停止系统.bat)，或在项目根目录运行 `docker compose down`。MySQL 数据卷会保留，下次启动会继续使用。
 - 首次创建空数据卷时，MySQL 按顺序加载 `schema.sql`、`data.sql` 和 `fitness.sql`。这个演示数据库随 Compose 项目管理，只有前端端口映射到本机。
-- 双击新版启动脚本会原地修复旧版写入的示例乱码，保留原数据卷和手动填写的内容，然后打开网页。
 - 8088 端口被占用时，可在项目根目录新建 `.env`，写入一行 `SPORTS_APP_PORT=8089` 后重启。双击脚本会读取实际端口。
 - 如果启动失败，运行 `docker compose ps` 查看服务状态，运行 `docker compose logs --tail 100` 查看日志。首次下载失败时，检查 Docker Desktop 的网络或代理设置后重试。
 
 这些账号和数据库默认配置适用于本机演示。启动顺序使用 Compose 的 [服务健康检查](https://docs.docker.com/compose/how-tos/startup-order/)。
-
-### 用 Compose 命令修复旧版示例乱码
-
-在新版项目目录启动服务后执行以下命令，再刷新网页。修复可重复运行。
-
-```sh
-docker compose exec -T db sh /opt/sports-events/demo-repair/repair.sh
-```
 
 ## 技术栈
 
