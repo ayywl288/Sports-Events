@@ -1,4 +1,6 @@
 -- 在现有 sports_events 数据库执行；不删除现有表或数据。
+SET NAMES utf8mb4;
+
 CREATE TABLE IF NOT EXISTS fitness_record (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
