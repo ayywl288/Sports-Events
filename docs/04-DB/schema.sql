@@ -5,6 +5,8 @@
 -- Version: 1.0.0
 -- ============================================================
 
+SET NAMES utf8mb4;
+
 -- 创建数据库
 CREATE DATABASE IF NOT EXISTS `sports_events` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
