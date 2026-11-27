@@ -26,6 +26,7 @@ export interface FitnessStudent {
 export interface FitnessClusters {
   features: string[]
   excludedCount: number
+  points: Array<{ bmi: number; run50Seconds: number; cluster: number }>
   analysis: {
     centers: number[][]
     counts: number[]
