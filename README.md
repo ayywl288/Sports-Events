@@ -23,7 +23,7 @@ docker compose up -d --build --wait
 | 学生 | `student1` | `123456` |
 
 - 停止时双击 [停止系统.bat](停止系统.bat)，或在项目根目录运行 `docker compose down`。MySQL 数据卷会保留，下次启动会继续使用。
-- 首次创建空数据卷时，MySQL 按顺序加载 `schema.sql`、`data.sql` 和 `fitness.sql`。这个演示数据库随 Compose 项目管理，只有前端端口映射到本机。
+- 首次创建空数据卷时，MySQL 加载建表脚本和赛事、体测模拟数据。只有前端端口映射到本机。
 - 8088 端口被占用时，可在项目根目录新建 `.env`，写入一行 `SPORTS_APP_PORT=8089` 后重启。双击脚本会读取实际端口。
 - 如果启动失败，运行 `docker compose ps` 查看服务状态，运行 `docker compose logs --tail 100` 查看日志。首次下载失败时，检查 Docker Desktop 的网络或代理设置后重试。
 
@@ -51,10 +51,10 @@ docker compose up -d --build --wait
 
 - 赛事管理、运动项目配置、报名与审核、赛程安排、比赛成绩、公告和统计。
 - 管理员、教师、学生的独立工作台与菜单。后端根据登录角色返回对应的工作台摘要。
-- 体测记录表与录入、修改、查询接口。管理员和教师也可以调用聚类接口，学生查询范围为本人。
-- K-Means 对 BMI、肺活量、50 米用时和立定跳远进行标准化后聚类，返回簇人数、聚类中心与误差指标。
+- 管理员和教师在「体测管理」录入、修改和查询学生体测记录，并可按测试日期查看聚类。学生在「我的体测」查询本人历史记录。
+- K-Means 对 BMI、肺活量、50 米用时和立定跳远进行标准化后聚类。页面展示各组人数、中心和误差指标。新演示库有五名模拟学生的同日记录，可直接运行默认的三组分析。
 
-体测专用页面、国家标准评分与等级、个人报告、历史趋势和聚类图表仍在后续计划中。
+国家标准评分与等级、个人体测报告和趋势图仍在后续计划中。
 
 ## 本地开发（可选）
 
@@ -68,6 +68,7 @@ docker compose up -d --build --wait
 mysql --default-character-set=utf8mb4 -u root -p -e "source docs/04-DB/schema.sql"
 mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source backend/src/main/resources/db/data.sql"
 mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source docs/04-DB/fitness.sql"
+mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source docs/04-DB/fitness-demo.sql"
 ```
 
 打开一个终端，从项目根目录打包并启动后端。按需修改 MySQL 地址和账户。

@@ -12,6 +12,10 @@ public class FitnessRecord {
     private Long id;
     @NotNull @Positive
     private Long userId;
+    @TableField(exist = false)
+    private String studentName;
+    @TableField(exist = false)
+    private String studentNo;
     @NotNull @PastOrPresent
     private LocalDate testDate;
     @NotNull @DecimalMin("50") @DecimalMax("250")
