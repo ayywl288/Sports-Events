@@ -16,6 +16,7 @@
 | POST | /api/fitness | 录入 |
 | PUT | /api/fitness/{id} | 修改，不存在时报错 |
 | GET | /api/fitness?current=1&size=10&userId=3&testDate=2026-11-18 | 分页查询，筛选可选 |
+| GET | /api/fitness/students?q= | 管理员和教师按姓名、学号搜索学生，最多返回 30 条 |
 | GET | /api/fitness/clusters?testDate=2026-11-18&k=3 | 按测试日期聚类，k为1至10 |
 
 录入、修改请求示例（userId换成数据库中有效学生ID，日期不可晚于当天）：
