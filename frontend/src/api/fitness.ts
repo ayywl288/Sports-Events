@@ -23,10 +23,15 @@ export interface FitnessStudent {
   studentNo?: string
 }
 
+export interface FitnessClusterPoint extends Pick<FitnessInput, 'vitalCapacity' | 'run50Seconds' | 'jumpCm'> {
+  bmi: number
+  cluster: number
+}
+
 export interface FitnessClusters {
   features: string[]
   excludedCount: number
-  points: Array<{ bmi: number; run50Seconds: number; cluster: number }>
+  points: FitnessClusterPoint[]
   analysis: {
     centers: number[][]
     counts: number[]
