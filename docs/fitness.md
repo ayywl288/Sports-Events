@@ -19,6 +19,8 @@
 | GET | /api/fitness/students?q= | 管理员和教师按姓名、学号搜索学生，最多返回 30 条 |
 | GET | /api/fitness/clusters?testDate=2026-11-18&k=3 | 按测试日期聚类，k为1至10 |
 
+聚类响应中的 `points` 提供散点图所用的 BMI、50 米秒数和分组索引。分组使用全部四项指标。
+
 录入、修改请求示例（userId换成数据库中有效学生ID，日期不可晚于当天）：
 
 ```json

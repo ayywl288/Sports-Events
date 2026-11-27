@@ -27,6 +27,7 @@ public class FitnessController {
     private final SysUserMapper userMapper;
 
     public record StudentOption(Long id, String name, String studentNo) {}
+    public record ProjectedPoint(double bmi, double run50Seconds, int cluster) {}
 
     @GetMapping("/students")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
@@ -109,9 +110,13 @@ public class FitnessController {
         KMeans.Analysis analysis;
         try { analysis = KMeans.fit(features, k); }
         catch (IllegalArgumentException e) { throw new BusinessException(e.getMessage()); }
+        var points = new ArrayList<ProjectedPoint>(valid.size());
+        for (int i = 0; i < features.length; i++) {
+            points.add(new ProjectedPoint(features[i][0], features[i][2], analysis.labels()[i]));
+        }
         return Result.success(Map.of("recordIds", valid.stream().map(FitnessRecord::getId).toList(),
                 "features", List.of("BMI", "肺活量ml", "50米秒数", "立定跳远cm"),
-                "analysis", analysis, "excludedCount", rows.size() - valid.size()));
+                "analysis", analysis, "excludedCount", rows.size() - valid.size(), "points", points));
     }
 
     private LambdaQueryWrapper<SysUser> studentColumns() {
