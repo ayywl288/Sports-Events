@@ -28,7 +28,23 @@
       <div class="cluster-layout">
         <section aria-labelledby="cluster-scatter-title">
           <h3 id="cluster-scatter-title">分组散点图</h3>
-          <p class="cluster-note cluster-projection">每个点代表一条记录。图中显示 BMI 和 50 米用时，颜色来自四项指标的聚类结果。</p>
+          <p class="cluster-note cluster-projection">每个点代表一条体测记录。切换坐标轴只改变展示维度，颜色始终对应四项指标的聚类结果。</p>
+          <div class="cluster-axes">
+            <div class="cluster-axis">
+              <label for="cluster-x-axis">横轴</label>
+              <el-select id="cluster-x-axis" v-model="xAxis" aria-label="横轴指标">
+                <el-option v-for="metric in metrics" :key="metric.key" :label="metric.label"
+                  :value="metric.key" :disabled="metric.key === yAxis" />
+              </el-select>
+            </div>
+            <div class="cluster-axis">
+              <label for="cluster-y-axis">纵轴</label>
+              <el-select id="cluster-y-axis" v-model="yAxis" aria-label="纵轴指标">
+                <el-option v-for="metric in metrics" :key="metric.key" :label="metric.label"
+                  :value="metric.key" :disabled="metric.key === xAxis" />
+              </el-select>
+            </div>
+          </div>
           <div ref="chartHost" class="cluster-chart" role="img" :aria-label="chartLabel"></div>
         </section>
         <section aria-labelledby="cluster-centers-title">
@@ -43,13 +59,25 @@
             </el-table-column>
             <el-table-column prop="count" label="人数" width="60" align="right" />
             <el-table-column
-              v-for="(feature, index) in centerHeaders" :key="feature"
-              :label="feature" min-width="86" align="right"
+              v-for="(metric, index) in metrics" :key="metric.key"
+              :label="metricLabel(metric)" min-width="86" align="right"
             >
-              <template #default="{ row }">{{ row.values[index]?.toFixed(index === 1 || index === 3 ? 0 : 2) }}</template>
+              <template #default="{ row }">{{ row.count ? row.values[index].toFixed(metric.decimals) : '—' }}</template>
             </el-table-column>
           </el-table>
-          <p class="cluster-note">中心按原单位显示。组号用于区分样本，国家体测等级由标准评分确定。</p>
+          <h3 id="cluster-insights-title" class="cluster-insights-title">各组特点与训练建议</h3>
+          <p class="cluster-note cluster-projection">特点按当天样本的肺活量、50 米和立定跳远比较，供集体训练安排参考。</p>
+          <ul class="cluster-insights" aria-labelledby="cluster-insights-title">
+            <li v-for="group in centers" :key="group.name">
+              <h4 class="cluster-legend-key">
+                <i :style="{ backgroundColor: group.color }" aria-hidden="true"></i>{{ group.name }}
+              </h4>
+              <div>
+                <p>{{ group.feature }}</p>
+                <p v-if="group.advice" class="cluster-advice">{{ group.advice }}</p>
+              </div>
+            </li>
+          </ul>
         </section>
       </div>
     </div>
@@ -67,7 +95,7 @@ import { init, use } from 'echarts/core'
 import type { ECharts } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { analyzeFitness } from '@/api/fitness'
-import type { FitnessClusters } from '@/api/fitness'
+import type { FitnessClusterPoint, FitnessClusters } from '@/api/fitness'
 
 use([ScatterChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
 
@@ -79,20 +107,82 @@ const error = ref('')
 const result = shallowRef<FitnessClusters>()
 const analyzedDate = ref('')
 const chartHost = ref<HTMLDivElement>()
-const centerHeaders = ['BMI', '肺活量 (mL)', '50 米 (秒)', '立定跳远 (cm)']
+type MetricKey = Exclude<keyof FitnessClusterPoint, 'cluster'>
+interface Metric {
+  key: MetricKey
+  label: string
+  unit?: string
+  decimals: number
+  comparison?: { direction: 1 | -1; above: string; below: string }
+}
+
+const metrics: Metric[] = [
+  { key: 'bmi', label: 'BMI', decimals: 2 },
+  { key: 'vitalCapacity', label: '肺活量', unit: 'mL', decimals: 0,
+    comparison: { direction: 1, above: '肺活量较高', below: '肺活量偏低' } },
+  { key: 'run50Seconds', label: '50 米用时', unit: '秒', decimals: 2,
+    comparison: { direction: -1, above: '50 米跑较快', below: '50 米跑偏慢' } },
+  { key: 'jumpCm', label: '立定跳远', unit: 'cm', decimals: 0,
+    comparison: { direction: 1, above: '立定跳远成绩较好', below: '立定跳远距离偏短' } }
+]
+const xAxis = ref<MetricKey>('bmi')
+const yAxis = ref<MetricKey>('run50Seconds')
+const xMetric = computed(() => metrics.find(metric => metric.key === xAxis.value)!)
+const yMetric = computed(() => metrics.find(metric => metric.key === yAxis.value)!)
 const palette = ['#4058c7', '#b84926', '#117969', '#8f4384', '#756512', '#116f91', '#646475', '#6451a4', '#a04560', '#316345']
 let chart: ECharts | undefined
 let resize: ResizeObserver | undefined
 
-const centers = computed(() => result.value?.analysis.centers.map((values, index) => ({
-  name: '第' + (index + 1) + '组',
-  color: palette[index],
-  count: result.value!.analysis.counts[index],
-  values
-})) ?? [])
+function metricLabel(metric: Metric) {
+  return metric.unit ? `${metric.label} (${metric.unit})` : metric.label
+}
+
+function trainingAdvice(weaknesses: MetricKey[], strengthCount: number) {
+  if (weaknesses.length >= 2) return '加强基础体能训练，优先练习相对薄弱的项目。'
+  if (weaknesses.includes('jumpCm')) return '加强下肢爆发力与起跳技术练习。'
+  if (weaknesses.includes('run50Seconds')) return '加强起跑与短距离加速练习。'
+  if (weaknesses.includes('vitalCapacity')) return '可在日常体育课中循序增加有氧耐力练习。'
+  if (strengthCount >= 2) return '保持优势，可适当安排进阶训练。'
+  return '保持常规体能练习，定期复测。'
+}
+
+const centers = computed(() => {
+  const analyzed = result.value
+  if (!analyzed) return []
+  const { analysis, points } = analyzed
+  const reference = metrics.map(({ key }) => {
+    const mean = points.reduce((sum, point) => sum + point[key], 0) / points.length
+    const deviation = Math.sqrt(points.reduce((sum, point) => sum + (point[key] - mean) ** 2, 0) / points.length)
+    return { mean, deviation }
+  })
+  return analysis.centers.map((values, index) => {
+    const group = { name: `第${index + 1}组`, color: palette[index], count: analysis.counts[index], values }
+    if (!group.count) return { ...group, feature: '当前分组暂无样本。', advice: '' }
+    const strengths: string[] = []
+    const weaknesses: MetricKey[] = []
+    const weakLabels: string[] = []
+    metrics.forEach(({ key, comparison }, metricIndex) => {
+      const { mean, deviation } = reference[metricIndex]
+      if (!comparison || deviation < 1e-9) return
+      // Report only differences of at least half a standard deviation within this cohort.
+      const relative = comparison.direction * (values[metricIndex] - mean) / deviation
+      if (relative >= 0.5) strengths.push(comparison.above)
+      if (relative <= -0.5) {
+        weaknesses.push(key)
+        weakLabels.push(comparison.below)
+      }
+    })
+    const description = [strengths.join('、'), weakLabels.join('、')].filter(Boolean).join('，但')
+    return {
+      ...group,
+      feature: description ? description + '。' : '三项表现接近当日样本平均水平。',
+      advice: trainingAdvice(weaknesses, strengths.length)
+    }
+  })
+})
 const total = computed(() => centers.value.reduce((sum, item) => sum + item.count, 0))
 const chartLabel = computed(() =>
-  'BMI 与 50 米用时散点图。' + centers.value.map(item => item.name + ' ' + item.count + ' 人').join('，')
+  `${xMetric.value.label}与${yMetric.value.label}散点图。` + centers.value.map(item => item.name + ' ' + item.count + ' 人').join('，')
 )
 
 watch(() => props.suggestedDate, value => {
@@ -106,33 +196,41 @@ function clearChart() {
   resize = undefined
 }
 
-watch([chartHost, result], ([host, analyzed]) => {
-  clearChart()
-  if (!host || !analyzed) return
+watch([chartHost, result, xMetric, yMetric], ([host, analyzed, horizontal, vertical]) => {
+  if (!host || !analyzed) {
+    clearChart()
+    return
+  }
+  if (chart?.getDom() !== host) {
+    clearChart()
+    chart = init(host)
+    resize = new ResizeObserver(() => chart?.resize())
+    resize.observe(host)
+  }
   const grouped = centers.value.map(() => [] as number[][])
   for (const point of analyzed.points) {
-    grouped[point.cluster].push([point.bmi, point.run50Seconds])
+    grouped[point.cluster].push([point[horizontal.key], point[vertical.key]])
   }
-  chart = init(host)
-  chart.setOption({
-    grid: { top: 44, bottom: 54, left: 58, right: 26 },
+  chart?.setOption({
+    grid: { top: 44, bottom: 54, left: 76, right: 26 },
     legend: { type: 'scroll', top: 2, itemGap: 13, textStyle: { color: '#33445d' } },
     tooltip: {
       trigger: 'item',
       renderMode: 'richText',
       formatter: (params: unknown) => {
         const point = params as { seriesName: string; value: [number, number] }
-        return point.seriesName + '\nBMI ' + point.value[0].toFixed(2)
-          + '\n50 米 ' + point.value[1].toFixed(2) + ' 秒'
+        return [point.seriesName, ...[horizontal, vertical].map((metric, index) =>
+          `${metric.label} ${point.value[index].toFixed(metric.decimals)}${metric.unit ? ' ' + metric.unit : ''}`
+        )].join('\n')
       }
     },
     xAxis: {
-      type: 'value', name: 'BMI', nameLocation: 'middle', nameGap: 31, scale: true,
-      minInterval: 1, splitLine: { lineStyle: { color: '#e5eaf1' } }
+      type: 'value', name: metricLabel(horizontal), nameLocation: 'middle', nameGap: 31, scale: true,
+      minInterval: horizontal.decimals === 0 ? 1 : 0.1, splitLine: { lineStyle: { color: '#e5eaf1' } }
     },
     yAxis: {
-      type: 'value', name: '50 米用时 (秒)', nameLocation: 'middle', nameGap: 39, scale: true,
-      minInterval: 0.5, splitLine: { lineStyle: { color: '#e5eaf1' } }
+      type: 'value', name: metricLabel(vertical), nameLocation: 'middle', nameGap: 51, scale: true,
+      minInterval: vertical.decimals === 0 ? 1 : 0.1, splitLine: { lineStyle: { color: '#e5eaf1' } }
     },
     series: centers.value.map((group, index) => ({
       name: group.name + ' · ' + group.count + ' 人',
@@ -141,9 +239,7 @@ watch([chartHost, result], ([host, analyzed]) => {
       symbolSize: 10,
       itemStyle: { color: group.color, opacity: 0.82 }
     }))
-  })
-  resize = new ResizeObserver(() => chart?.resize())
-  resize.observe(host)
+  }, { replaceMerge: ['series'] })
 }, { flush: 'post' })
 
 watch([date, k], () => {
@@ -191,9 +287,17 @@ async function runAnalysis() {
 .cluster-chart { width: 100%; height: 340px; }
 .cluster-note { margin: 10px 0 0; }
 .cluster-projection { margin: -4px 0 8px; }
+.cluster-axes { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 13px 0 8px; }
+.cluster-axis { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.cluster-axis :deep(.el-select) { width: 130px; }
 .cluster-legend-key { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .cluster-legend-key i { width: 8px; height: 8px; border-radius: 50%; }
 .cluster-panel :deep(.el-table) { font-variant-numeric: tabular-nums; }
+.cluster-layout .cluster-insights-title { margin-top: 19px; }
+.cluster-insights { list-style: none; padding: 0; margin: 0; }
+.cluster-insights li { display: flex; align-items: baseline; gap: 12px; border-top: 1px solid var(--border-light, #e5eaf1); padding: 9px 0; font-size: 13px; line-height: 1.55; }
+.cluster-insights h4, .cluster-insights p { margin: 0; }
+.cluster-insights .cluster-advice { color: var(--text-secondary, #50627a); margin-top: 2px; }
 @media (max-width: 1050px) {
   .cluster-layout { grid-template-columns: 1fr; gap: 14px; }
   .cluster-chart { height: 310px; }

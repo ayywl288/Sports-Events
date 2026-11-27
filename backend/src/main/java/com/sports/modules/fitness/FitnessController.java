@@ -27,7 +27,7 @@ public class FitnessController {
     private final SysUserMapper userMapper;
 
     public record StudentOption(Long id, String name, String studentNo) {}
-    public record ProjectedPoint(double bmi, double run50Seconds, int cluster) {}
+    public record ProjectedPoint(double bmi, double vitalCapacity, double run50Seconds, double jumpCm, int cluster) {}
 
     @GetMapping("/students")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
@@ -112,7 +112,8 @@ public class FitnessController {
         catch (IllegalArgumentException e) { throw new BusinessException(e.getMessage()); }
         var points = new ArrayList<ProjectedPoint>(valid.size());
         for (int i = 0; i < features.length; i++) {
-            points.add(new ProjectedPoint(features[i][0], features[i][2], analysis.labels()[i]));
+            double[] row = features[i];
+            points.add(new ProjectedPoint(row[0], row[1], row[2], row[3], analysis.labels()[i]));
         }
         return Result.success(Map.of("recordIds", valid.stream().map(FitnessRecord::getId).toList(),
                 "features", List.of("BMI", "肺活量ml", "50米秒数", "立定跳远cm"),
