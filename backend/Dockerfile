@@ -2,7 +2,8 @@ FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /build
 COPY pom.xml ./
 COPY src ./src
-RUN mvn -B -ntp -DskipTests package
+RUN --mount=type=cache,id=sports-events-maven,target=/root/.m2/repository,sharing=locked \
+    mvn -B -DskipTests package
 
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app

@@ -105,6 +105,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/statistics/index.vue'),
         meta: { title: '统计分析', icon: 'DataAnalysis', roles: ['ADMIN', 'TEACHER'] }
       },
+      // 体测记录
+      {
+        path: 'fitness',
+        name: 'Fitness',
+        component: () => import('@/views/fitness/index.vue'),
+        meta: { title: '体测记录', icon: 'DataLine', roles: ['ADMIN', 'TEACHER', 'STUDENT'] }
+      },
       // 个人中心
       {
         path: 'profile',

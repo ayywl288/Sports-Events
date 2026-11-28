@@ -57,8 +57,14 @@ try {
         throw '未找到 Docker Compose。请更新 Docker Desktop。'
     }
 
-    Write-Host '正在启动 MySQL、后端和前端。首次下载镜像和依赖可能需要几分钟...'
-    & $dockerExe compose up -d --build --wait --wait-timeout 240
+    Write-Host '正在检查前后端镜像。首次构建需要下载依赖，请留意下方构建进度。'
+    & $dockerExe compose --progress plain build
+    if ($LASTEXITCODE -ne 0) {
+        throw '镜像构建失败。请查看上方具体的下载或编译错误。'
+    }
+
+    Write-Host '镜像已就绪，正在启动 MySQL、后端和前端并检查服务状态...'
+    & $dockerExe compose up -d --no-build --wait --wait-timeout 240
     if ($LASTEXITCODE -ne 0) {
         throw '服务启动失败。请查看上方错误，或在项目目录运行 docker compose logs。'
     }

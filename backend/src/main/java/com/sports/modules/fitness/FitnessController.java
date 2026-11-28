@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sports.common.exception.BusinessException;
 import com.sports.common.result.Result;
+import com.sports.modules.system.entity.SysUser;
 import com.sports.modules.system.mapper.SysUserMapper;
 import com.sports.modules.fitness.mapper.FitnessMapper;
 import com.sports.security.util.SecurityUtils;
@@ -25,6 +26,25 @@ public class FitnessController {
     private final FitnessMapper mapper;
     private final SysUserMapper userMapper;
 
+    public record StudentOption(Long id, String name, String studentNo) {}
+    public record ProjectedPoint(double bmi, double vitalCapacity, double run50Seconds, double jumpCm, int cluster) {}
+
+    @GetMapping("/students")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<List<StudentOption>> students(
+            @RequestParam(defaultValue = "") @Size(max = 80) String q) {
+        var filter = studentColumns().eq(SysUser::getRole, "STUDENT");
+        if (!q.isBlank()) {
+            String keyword = q.strip();
+            filter.and(query -> query.like(SysUser::getRealName, keyword)
+                    .or().like(SysUser::getStudentNo, keyword));
+        }
+        return Result.success(userMapper.selectList(
+                        filter.orderByAsc(SysUser::getStudentNo, SysUser::getId).last("LIMIT 30"))
+                .stream().map(user -> new StudentOption(user.getId(), user.getRealName(), user.getStudentNo()))
+                .toList());
+    }
+
     @GetMapping
     public Result<Page<FitnessRecord>> list(
             @RequestParam(defaultValue = "1") @Min(1) int current,
@@ -33,11 +53,25 @@ public class FitnessController {
             @RequestParam(required = false) LocalDate testDate) {
         // 学生只能查自己，不能通过传入他人ID越权。
         if (!SecurityUtils.isAdmin() && !SecurityUtils.isTeacher()) userId = SecurityUtils.getUserId();
-        return Result.success(mapper.selectPage(new Page<>(current, size),
+        var page = mapper.selectPage(new Page<FitnessRecord>(current, size),
                 new LambdaQueryWrapper<FitnessRecord>()
                         .eq(userId != null, FitnessRecord::getUserId, userId)
                         .eq(testDate != null, FitnessRecord::getTestDate, testDate)
-                        .orderByDesc(FitnessRecord::getTestDate).orderByDesc(FitnessRecord::getId)));
+                        .orderByDesc(FitnessRecord::getTestDate).orderByDesc(FitnessRecord::getId));
+        if (!page.getRecords().isEmpty()) {
+            var studentIds = page.getRecords().stream().map(FitnessRecord::getUserId).distinct().toList();
+            var students = new HashMap<Long, SysUser>();
+            userMapper.selectList(studentColumns().in(SysUser::getId, studentIds))
+                    .forEach(user -> students.put(user.getId(), user));
+            for (var record : page.getRecords()) {
+                var student = students.get(record.getUserId());
+                if (student != null) {
+                    record.setStudentName(student.getRealName());
+                    record.setStudentNo(student.getStudentNo());
+                }
+            }
+        }
+        return Result.success(page);
     }
 
     @PostMapping
@@ -76,9 +110,18 @@ public class FitnessController {
         KMeans.Analysis analysis;
         try { analysis = KMeans.fit(features, k); }
         catch (IllegalArgumentException e) { throw new BusinessException(e.getMessage()); }
+        var points = new ArrayList<ProjectedPoint>(valid.size());
+        for (int i = 0; i < features.length; i++) {
+            double[] row = features[i];
+            points.add(new ProjectedPoint(row[0], row[1], row[2], row[3], analysis.labels()[i]));
+        }
         return Result.success(Map.of("recordIds", valid.stream().map(FitnessRecord::getId).toList(),
                 "features", List.of("BMI", "肺活量ml", "50米秒数", "立定跳远cm"),
-                "analysis", analysis, "excludedCount", rows.size() - valid.size()));
+                "analysis", analysis, "excludedCount", rows.size() - valid.size(), "points", points));
+    }
+
+    private LambdaQueryWrapper<SysUser> studentColumns() {
+        return new LambdaQueryWrapper<SysUser>().select(SysUser::getId, SysUser::getRealName, SysUser::getStudentNo);
     }
 
     private void checkStudent(Long id) {

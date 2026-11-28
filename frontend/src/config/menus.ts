@@ -39,6 +39,7 @@ export const ROLE_MENUS: Record<UserRole, MenuNode[]> = {
     },
     { path: '/registrations', title: '报名审核', icon: 'DocumentChecked' },
     { path: '/results', title: '成绩管理', icon: 'Medal' },
+    { path: '/fitness', title: '体测管理', icon: 'DataLine' },
     { path: '/statistics', title: '统计分析', icon: 'DataAnalysis' },
     { path: '/news', title: '公告管理', icon: 'Bell' },
     { path: '/users', title: '用户管理', icon: 'User' }
@@ -49,6 +50,7 @@ export const ROLE_MENUS: Record<UserRole, MenuNode[]> = {
     { path: '/registrations', title: '报名审核', icon: 'DocumentChecked' },
     { path: '/schedules', title: '赛程查看', icon: 'Calendar' },
     { path: '/results', title: '成绩录入', icon: 'Medal' },
+    { path: '/fitness', title: '体测管理', icon: 'DataLine' },
     { path: '/statistics', title: '统计分析', icon: 'DataAnalysis' },
     { path: '/news', title: '公告通知', icon: 'Bell' }
   ],
@@ -58,7 +60,8 @@ export const ROLE_MENUS: Record<UserRole, MenuNode[]> = {
     { path: '/my-registrations', title: '我的报名', icon: 'Tickets' },
     { path: '/my-schedules', title: '我的日程', icon: 'Calendar' },
     { path: '/my-results', title: '我的成绩', icon: 'DataLine' },
-    { path: '/schedules', title: '全部赛程', icon: 'Clock' },
+    { path: '/fitness', title: '我的体测', icon: 'DataLine' },
+    { path: '/schedules', title: '赛程安排', icon: 'Calendar' },
     { path: '/news', title: '公告通知', icon: 'Bell' }
   ]
 }
