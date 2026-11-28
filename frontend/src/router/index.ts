@@ -106,6 +106,20 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/fitness/index.vue'),
         meta: { title: '体测记录', icon: 'DataLine', roles: ['ADMIN', 'TEACHER', 'STUDENT'] }
       },
+      // 国标体测评分（教师录入与审核）
+      {
+        path: 'fitness-score',
+        name: 'FitnessScoreAdmin',
+        component: () => import('@/views/fitness/scoring.vue'),
+        meta: { title: '国标评分', icon: 'Aim', roles: ['ADMIN', 'TEACHER'] }
+      },
+      // 学生个人体测成绩单
+      {
+        path: 'my-fitness-score',
+        name: 'MyFitnessScore',
+        component: () => import('@/views/fitness/my-score.vue'),
+        meta: { title: '体测成绩', icon: 'Aim', roles: ['STUDENT'] }
+      },
       // 个人中心
       {
         path: 'profile',
