@@ -46,6 +46,18 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class FitnessScoreService {
 
+    private static final Map<String, String> ITEM_LABELS = Map.of(
+            "BMI", "体重指数(BMI)",
+            "VITAL_CAPACITY", "肺活量",
+            "RUN_50M", "50米跑",
+            "SIT_REACH", "坐位体前屈",
+            "LONG_JUMP", "立定跳远",
+            "PULL_UP", "引体向上",
+            "SIT_UP", "1分钟仰卧起坐",
+            "RUN_1000M", "1000米跑",
+            "RUN_800M", "800米跑"
+    );
+
     private final FitnessScoreMapper scoreMapper;
     private final SysUserMapper userMapper;
     private final FitnessScoringService scoringService;
@@ -68,6 +80,7 @@ public class FitnessScoreService {
         Gender gender = resolveGender(request.getGender(), student);
         String academicYear = resolveAcademicYear(request.getAcademicYear(), request.getTestDate());
         ScoreReport report = calculate(request, gender);
+        ensureAllItemsMeasured(report);
 
         FitnessScoreRecord record = new FitnessScoreRecord();
         copyRequest(request, record);
@@ -98,6 +111,7 @@ public class FitnessScoreService {
         Gender gender = resolveGender(request.getGender(), student);
         String academicYear = resolveAcademicYear(request.getAcademicYear(), request.getTestDate());
         ScoreReport report = calculate(request, gender);
+        ensureAllItemsMeasured(report);
 
         LambdaUpdateWrapper<FitnessScoreRecord> update = new LambdaUpdateWrapper<FitnessScoreRecord>()
                 .eq(FitnessScoreRecord::getId, id)
@@ -159,11 +173,13 @@ public class FitnessScoreService {
         return latestByYear.values().stream().map(record -> toVO(record, student)).toList();
     }
 
-    /** 详情：教师/管理员可看全部，学生只能看本人。 */
+    /** 详情：教师/管理员可看全部；学生只能看本人且已审核有效的成绩。 */
     public FitnessScoreVO detail(Long id) {
         FitnessScoreRecord record = requireRecord(id);
-        if (SecurityUtils.isStudent() && !record.getUserId().equals(SecurityUtils.getUserId())) {
-            throw new BusinessException(403, "只能查看本人的体测成绩");
+        if (SecurityUtils.isStudent()
+                && (!record.getUserId().equals(SecurityUtils.getUserId())
+                || !RecordStatus.VALID.name().equals(record.getStatus()))) {
+            throw new BusinessException(404, "体测成绩不存在");
         }
         return toVO(record, userMapper.selectById(record.getUserId()));
     }
@@ -171,6 +187,9 @@ public class FitnessScoreService {
     /** 审核状态变更。 */
     public FitnessScoreVO updateStatus(Long id, RecordStatus status, String operator) {
         FitnessScoreRecord record = requireRecord(id);
+        if (status == RecordStatus.VALID) {
+            ensureRecordComplete(record);
+        }
         String auditOperator = operator == null || operator.isBlank()
                 ? SecurityUtils.getUsername() : operator.trim();
         LocalDateTime auditTime = LocalDateTime.now();
@@ -206,13 +225,53 @@ public class FitnessScoreService {
     private ScoreReport calculate(FitnessScoreRequest request, Gender gender) {
         ScoreInput input = buildInput(request, gender);
         try {
-            // 新建/修改都只针对有效记录，状态守卫保留在引擎入口。
+            // 试算允许缺项；写入有效成绩前由 ensureAllItemsMeasured 统一拦截。
             return scoringService.calculate(input, RecordStatus.VALID);
         } catch (InvalidRecordException e) {
             throw new BusinessException(409, e.getMessage());
         } catch (IllegalArgumentException e) {
             throw new BusinessException(400, e.getMessage());
         }
+    }
+
+    /** 只有 7 项必测全部完成，才允许保存/发布为有效成绩。 */
+    private void ensureAllItemsMeasured(ScoreReport report) {
+        List<String> missing = report.getMissingItemCodes();
+        if (missing == null || missing.isEmpty()) {
+            return;
+        }
+        String names = String.join("、", missing.stream()
+                .map(code -> ITEM_LABELS.getOrDefault(code, code))
+                .toList());
+        throw new BusinessException(400, "缺测项目：" + names + "，请补齐必测项后再保存有效成绩");
+    }
+
+    /** 审核恢复为有效前，按存档数据重新校验完整度，避免历史缺项记录被发布。 */
+    private void ensureRecordComplete(FitnessScoreRecord record) {
+        if (record.getHeightCm() == null || record.getWeightKg() == null) {
+            throw new BusinessException(400, "缺测项目：身高、体重，请补齐必测项后再发布成绩");
+        }
+        if (record.getGender() == null || record.getGroupType() == null) {
+            throw new BusinessException(400, "成绩缺少性别或组别信息，无法发布");
+        }
+        FitnessScoreRequest request = new FitnessScoreRequest();
+        request.setUserId(record.getUserId());
+        request.setTestDate(record.getTestDate());
+        request.setHeightCm(record.getHeightCm());
+        request.setWeightKg(record.getWeightKg());
+        request.setVitalCapacity(record.getVitalCapacity());
+        request.setRun50Seconds(record.getRun50Seconds());
+        request.setSitReachCm(record.getSitReachCm());
+        request.setJumpCm(record.getJumpCm());
+        request.setStrengthCount(record.getStrengthCount());
+        request.setEnduranceSeconds(record.getEnduranceSeconds());
+        try {
+            request.setGender(Gender.valueOf(record.getGender()));
+            request.setGroupType(GroupType.valueOf(record.getGroupType()));
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(400, "成绩性别或组别数据异常，无法发布");
+        }
+        ensureAllItemsMeasured(calculate(request, request.getGender()));
     }
 
     private ScoreInput buildInput(FitnessScoreRequest request, Gender gender) {
