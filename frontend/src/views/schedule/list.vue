@@ -41,9 +41,10 @@
             <el-tag :type="getStatusType(row.status)">{{ row.statusName || getStatusName(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column v-if="canManage" label="操作" width="220" fixed="right">
+        <el-table-column v-if="canManage" label="操作" width="300" fixed="right">
           <template #default="{ row }">
             <el-button v-if="row.status !== 3" type="primary" link @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="row.status !== 3" type="warning" link @click="handleParticipants(row)">选手安排</el-button>
             <el-button v-if="row.status === 1" type="success" link @click="handleStart(row)">开始</el-button>
             <el-button v-if="row.status === 2" type="warning" link @click="handleComplete(row)">完成</el-button>
             <el-button v-if="row.status !== 2" type="danger" link @click="handleDelete(row)">删除</el-button>
@@ -103,15 +104,57 @@
         </el-form-item>
       </el-form>
       <template #footer>
+        <el-button :loading="checkLoading" @click="handleCheckConflicts">冲突检测</el-button>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 选手安排弹窗 -->
+    <el-dialog v-model="participantVisible" title="选手安排" width="760px" destroy-on-close>
+      <div v-if="currentSchedule" class="participant-summary">
+        <div class="participant-summary__title">
+          {{ currentSchedule.eventName }} · {{ currentSchedule.sportItemName }}
+        </div>
+        <div class="participant-summary__meta">
+          {{ currentSchedule.matchDate }} {{ currentSchedule.startTime }}-{{ currentSchedule.endTime }}
+          · {{ currentSchedule.scheduleName || '未命名赛程' }}
+          <span v-if="currentSchedule.groupNo"> · {{ currentSchedule.groupNo }}</span>
+        </div>
+      </div>
+      <el-alert
+        class="mb-10"
+        type="info"
+        :closable="false"
+        show-icon
+        title="仅显示该项目已通过审核的报名人员；保存时会校验选手在同一时段是否已被安排其他场次。"
+      />
+      <el-table
+        ref="participantTableRef"
+        :data="candidateList"
+        v-loading="participantLoading"
+        border
+        max-height="420"
+        empty-text="该项目暂无已通过审核的报名人员"
+        @selection-change="handleParticipantSelection"
+      >
+        <el-table-column type="selection" width="52" />
+        <el-table-column prop="studentNo" label="学号" width="120" />
+        <el-table-column prop="realName" label="姓名" width="110" />
+        <el-table-column prop="username" label="账号" width="120" />
+        <el-table-column prop="college" label="学院" min-width="140" />
+        <el-table-column prop="phone" label="手机号" width="140" />
+      </el-table>
+      <template #footer>
+        <el-button @click="participantVisible = false">取消</el-button>
+        <el-button type="primary" :loading="participantSaving" @click="handleSaveParticipants">保存安排</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, h } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { get, post, put, del } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
@@ -135,8 +178,17 @@ const queryParams = reactive({
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const submitLoading = ref(false)
+const checkLoading = ref(false)
 const formRef = ref<FormInstance>()
 const editingId = ref<number | null>(null)
+
+const participantVisible = ref(false)
+const participantLoading = ref(false)
+const participantSaving = ref(false)
+const participantTableRef = ref<any>()
+const currentSchedule = ref<any>(null)
+const candidateList = ref<any[]>([])
+const selectedRegistrationIds = ref<number[]>([])
 
 const formData = reactive({
   eventId: null as number | null,
@@ -155,7 +207,8 @@ const rules: FormRules = {
   eventId: [{ required: true, message: '请选择所属赛事', trigger: 'change' }],
   sportItemId: [{ required: true, message: '请选择运动项目', trigger: 'change' }],
   matchDate: [{ required: true, message: '请选择比赛日期', trigger: 'change' }],
-  startTime: [{ required: true, message: '请选择开始时间', trigger: 'change' }]
+  startTime: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
+  endTime: [{ required: true, message: '请选择结束时间', trigger: 'change' }]
 }
 
 onMounted(() => {
@@ -263,6 +316,88 @@ async function handleSubmit() {
   })
 }
 
+async function handleCheckConflicts() {
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    checkLoading.value = true
+    try {
+      const res = await post<string[]>('/schedules/check-conflicts', {
+        ...formData,
+        id: editingId.value
+      })
+      if (res.code === 200) {
+        const conflicts = res.data || []
+        if (!conflicts.length) {
+          ElMessage.success('未检测到冲突（选手冲突以已保存的选手安排为准）')
+          return
+        }
+        const conflictContent = h(
+          'div',
+          { style: 'line-height: 1.9;' },
+          conflicts.map((item, index) =>
+            h('div', { style: 'word-break: break-all;' }, `${index + 1}. ${item}`)
+          )
+        )
+        ElMessageBox.alert(conflictContent, '检测到赛程冲突', {
+          type: 'warning',
+          confirmButtonText: '知道了'
+        })
+      }
+    } finally {
+      checkLoading.value = false
+    }
+  })
+}
+
+async function handleParticipants(row: any) {
+  currentSchedule.value = row
+  candidateList.value = []
+  selectedRegistrationIds.value = []
+  participantVisible.value = true
+  participantLoading.value = true
+  try {
+    const [candidateRes, assignedRes] = await Promise.all([
+      get('/registrations/participants', { eventId: row.eventId, sportItemId: row.sportItemId }),
+      get(`/schedules/${row.id}/participants`)
+    ])
+    if (candidateRes.code === 200) {
+      candidateList.value = candidateRes.data || []
+    }
+    const assignedIds = new Set<number>(
+      (assignedRes.code === 200 ? assignedRes.data || [] : []).map((item: any) => item.id)
+    )
+    await nextTick()
+    participantTableRef.value?.clearSelection()
+    candidateList.value.forEach((item: any) => {
+      if (assignedIds.has(item.id)) {
+        participantTableRef.value?.toggleRowSelection(item, true)
+      }
+    })
+  } finally {
+    participantLoading.value = false
+  }
+}
+
+function handleParticipantSelection(rows: any[]) {
+  selectedRegistrationIds.value = rows.map((row) => row.id)
+}
+
+async function handleSaveParticipants() {
+  if (!currentSchedule.value) return
+  participantSaving.value = true
+  try {
+    await put(`/schedules/${currentSchedule.value.id}/participants`, {
+      registrationIds: selectedRegistrationIds.value
+    })
+    ElMessage.success('选手安排已保存')
+    participantVisible.value = false
+    loadData()
+  } finally {
+    participantSaving.value = false
+  }
+}
+
 async function handleStart(row: any) {
   await ElMessageBox.confirm('确定要开始该场比赛吗？', '提示', { type: 'warning' })
   await post(`/schedules/${row.id}/start`)
@@ -284,3 +419,25 @@ async function handleDelete(row: any) {
   loadData()
 }
 </script>
+
+<style scoped lang="scss">
+.participant-summary {
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(124, 58, 237, 0.08));
+  border: 1px solid rgba(37, 99, 235, 0.16);
+
+  &__title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  &__meta {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+}
+</style>

@@ -58,6 +58,7 @@ export const ROLE_MENUS: Record<UserRole, MenuNode[]> = {
     { path: '/dashboard', title: '我的工作台', icon: 'Odometer' },
     { path: '/events', title: '赛事大厅', icon: 'Trophy' },
     { path: '/my-registrations', title: '我的报名', icon: 'Tickets' },
+    { path: '/my-schedules', title: '我的日程', icon: 'Calendar' },
     { path: '/my-results', title: '我的成绩', icon: 'DataLine' },
     { path: '/fitness', title: '我的体测', icon: 'DataLine' },
     { path: '/schedules', title: '赛程安排', icon: 'Calendar' },

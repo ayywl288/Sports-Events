@@ -5,6 +5,7 @@ SET @demo_day = CURRENT_DATE();
 -- 清空表数据（按外键依赖顺序）
 SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE result;
+TRUNCATE TABLE schedule_participant;
 TRUNCATE TABLE schedule;
 TRUNCATE TABLE registration;
 TRUNCATE TABLE sport_item;
@@ -108,6 +109,54 @@ VALUES
     (1, 2, '女子100米预赛', 1, '1组', @demo_day + INTERVAL 14 DAY, '10:15:00', '10:45:00', '校田径场', 1, '女子100米预赛'),
     (1, 2, '女子100米决赛', 2, NULL, @demo_day + INTERVAL 15 DAY, '15:45:00', '16:15:00', '校田径场', 1, '女子100米决赛'),
     (1, 3, '男子跳远决赛', 1, NULL, @demo_day + INTERVAL 16 DAY, '09:00:00', '12:00:00', '跳远沙坑', 1, '男子跳远决赛');
+
+-- 插入赛程选手安排（只安排到具体场次的学生才会出现在个人日程中）
+-- 男子100米预赛：第1组 王小明/张小强，第2组 陈小伟
+INSERT INTO schedule_participant (schedule_id, registration_id)
+SELECT s.id, r.id
+FROM schedule s
+JOIN registration r
+  ON r.event_id = s.event_id
+ AND r.sport_item_id = s.sport_item_id
+ AND r.status = 2
+ AND r.is_deleted = 0
+WHERE s.event_id = 1 AND s.sport_item_id = 1 AND s.group_no = '1组'
+  AND r.user_id IN (4, 6);
+
+INSERT INTO schedule_participant (schedule_id, registration_id)
+SELECT s.id, r.id
+FROM schedule s
+JOIN registration r
+  ON r.event_id = s.event_id
+ AND r.sport_item_id = s.sport_item_id
+ AND r.status = 2
+ AND r.is_deleted = 0
+WHERE s.event_id = 1 AND s.sport_item_id = 1 AND s.group_no = '2组'
+  AND r.user_id = 8;
+
+-- 女子100米预赛：李小红
+INSERT INTO schedule_participant (schedule_id, registration_id)
+SELECT s.id, r.id
+FROM schedule s
+JOIN registration r
+  ON r.event_id = s.event_id
+ AND r.sport_item_id = s.sport_item_id
+ AND r.status = 2
+ AND r.is_deleted = 0
+WHERE s.event_id = 1 AND s.sport_item_id = 2 AND s.group_no = '1组'
+  AND r.user_id = 5;
+
+-- 男子跳远决赛：王小明/陈小伟
+INSERT INTO schedule_participant (schedule_id, registration_id)
+SELECT s.id, r.id
+FROM schedule s
+JOIN registration r
+  ON r.event_id = s.event_id
+ AND r.sport_item_id = s.sport_item_id
+ AND r.status = 2
+ AND r.is_deleted = 0
+WHERE s.event_id = 1 AND s.sport_item_id = 3 AND s.group_no IS NULL
+  AND r.user_id IN (4, 8);
 
 -- 插入新闻/公告数据
 -- status：0草稿 1已发布

@@ -14,6 +14,7 @@
       <div class="wb-hero__actions">
         <el-button round @click="router.push('/events')">赛事大厅</el-button>
         <el-button round @click="router.push('/my-registrations')">我的报名</el-button>
+        <el-button round @click="router.push('/my-schedules')">我的日程</el-button>
         <el-button round @click="router.push('/my-results')">我的成绩</el-button>
       </div>
     </section>

@@ -96,4 +96,14 @@ public class ScheduleVO {
      * 备注
      */
     private String remark;
+
+    /**
+     * 是否存在时间冲突（仅个人日程场景计算）
+     */
+    private Boolean conflict;
+
+    /**
+     * 冲突说明（仅个人日程场景计算）
+     */
+    private String conflictRemark;
 }
