@@ -6,7 +6,7 @@
 
 Windows 上安装 Docker Desktop 并完成首次设置，使用 Linux 容器模式。解压项目后，**双击项目根目录中的 [启动系统.bat](启动系统.bat)**。脚本会打开 Docker Desktop（如果还没运行），启动 MySQL、Spring Boot 后端和 Vue 前端，等服务就绪后自动打开 [系统首页](http://127.0.0.1:8088/)。
 
-首次启动要联网下载镜像和构建依赖，可能需要几分钟。Java、Node.js、MySQL 都由容器提供，演示电脑只需准备 Docker Desktop。
+首次启动要联网下载镜像和构建依赖，可能需要几分钟。脚本会显示构建进度，后续后端重新构建时会复用已下载的 Maven 依赖。Java、Node.js、MySQL 都由容器提供，演示电脑只需准备 Docker Desktop。
 
 Docker 已经运行时，也可以在项目根目录执行下面的命令。
 
