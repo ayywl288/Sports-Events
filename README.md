@@ -20,10 +20,10 @@ docker compose up -d --build --wait
 | --- | --- | --- |
 | 管理员 | `admin` | `123456` |
 | 教师 | `teacher1` | `123456` |
-| 学生 | `student1` | `123456` |
+| 学生 | `student1` 至 `student5` | `123456` |
 
 - 停止时双击 [停止系统.bat](停止系统.bat)，或在项目根目录运行 `docker compose down`。MySQL 数据卷会保留，下次启动会继续使用。
-- 首次创建空数据卷时，MySQL 加载建表脚本和赛事、体测模拟数据。只有前端端口映射到本机。
+- 首次创建空数据卷时，MySQL 加载建表脚本和赛事、体测模拟数据。学生演示账号登录后，在「体测成绩」可直接查看本人的国标模拟成绩单。只有前端端口映射到本机。
 - 8088 端口被占用时，可在项目根目录新建 `.env`，写入一行 `SPORTS_APP_PORT=8089` 后重启。双击脚本会读取实际端口。
 - 如果启动失败，运行 `docker compose ps` 查看服务状态，运行 `docker compose logs --tail 100` 查看日志。首次下载失败时，检查 Docker Desktop 的网络或代理设置后重试。
 
@@ -71,6 +71,7 @@ mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source backen
 mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source docs/04-DB/fitness.sql"
 mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source docs/04-DB/fitness-demo.sql"
 mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source docs/04-DB/fitness_scoring.sql"
+mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source docs/04-DB/fitness-score-demo.sql"
 ```
 
 打开一个终端，从项目根目录打包并启动后端。按需修改 MySQL 地址和账户。
