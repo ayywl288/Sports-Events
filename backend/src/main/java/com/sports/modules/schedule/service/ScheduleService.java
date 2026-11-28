@@ -2,6 +2,7 @@ package com.sports.modules.schedule.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.sports.modules.registration.vo.RegistrationVO;
 import com.sports.modules.schedule.entity.Schedule;
 import com.sports.modules.schedule.vo.ScheduleVO;
 
@@ -50,7 +51,7 @@ public interface ScheduleService extends IService<Schedule> {
     void completeMatch(Long id);
 
     /**
-     * 查询某个学生（已通过报名）的个人日程，并标记时间冲突
+     * 查询某个学生被安排的场次日程，并标记时间冲突
      */
     List<ScheduleVO> listSchedulesByUser(Long userId);
 
@@ -58,4 +59,14 @@ public interface ScheduleService extends IService<Schedule> {
      * 预检赛程冲突（场地 / 选手 / 重复场次），返回冲突说明
      */
     List<String> checkConflicts(Schedule schedule);
+
+    /**
+     * 查询某场赛程已安排的参赛人员
+     */
+    List<RegistrationVO> listScheduleParticipants(Long scheduleId);
+
+    /**
+     * 保存某场赛程的参赛人员安排（整场替换）
+     */
+    void assignScheduleParticipants(Long scheduleId, List<Long> registrationIds);
 }

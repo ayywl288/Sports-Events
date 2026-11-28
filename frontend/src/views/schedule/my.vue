@@ -4,7 +4,7 @@
       <div>
         <div class="ms-hero__title">我的日程</div>
         <div class="ms-hero__desc">
-          根据已通过审核的报名自动生成；同一时段参加多个项目会被标记为时间冲突
+          只展示已安排你参加的具体场次；同一时段被安排多场会被标记为时间冲突
         </div>
       </div>
       <div class="ms-hero__actions">
@@ -26,7 +26,7 @@
     </div>
 
     <div v-loading="loading" class="ms-body">
-      <el-empty v-if="!loading && !list.length" description="暂无比赛安排，先去报名参加项目吧">
+      <el-empty v-if="!loading && !list.length" description="暂无比赛安排，报名审核通过并完成场次分配后会显示在这里">
         <el-button type="primary" @click="router.push('/events')">去报名参赛</el-button>
       </el-empty>
 

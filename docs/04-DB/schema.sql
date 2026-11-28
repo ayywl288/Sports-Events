@@ -192,6 +192,21 @@ CREATE TABLE `schedule` (
     KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='赛程表';
 
+-- 4.2 赛程参赛人员表 (schedule_participant)
+DROP TABLE IF EXISTS `schedule_participant`;
+CREATE TABLE `schedule_participant` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `schedule_id` BIGINT NOT NULL COMMENT '赛程ID',
+    `registration_id` BIGINT NOT NULL COMMENT '报名ID',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除: 0-否 1-是',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_schedule_registration` (`schedule_id`, `registration_id`, `is_deleted`),
+    KEY `idx_schedule_id` (`schedule_id`),
+    KEY `idx_registration_id` (`registration_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='赛程参赛人员表';
+
 -- ============================================================
 -- 5. 成绩管理模块
 -- ============================================================

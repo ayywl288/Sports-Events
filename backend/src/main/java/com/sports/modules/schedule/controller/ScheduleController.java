@@ -5,6 +5,8 @@ import com.sports.common.exception.BusinessException;
 import com.sports.common.result.PageResult;
 import com.sports.common.result.Result;
 import com.sports.common.result.ResultCode;
+import com.sports.modules.registration.vo.RegistrationVO;
+import com.sports.modules.schedule.dto.ScheduleParticipantDTO;
 import com.sports.modules.schedule.entity.Schedule;
 import com.sports.modules.schedule.service.ScheduleService;
 import com.sports.modules.schedule.service.impl.ScheduleServiceImpl;
@@ -65,6 +67,22 @@ public class ScheduleController {
     @PreAuthorize("hasRole('ADMIN')")
     public Result<List<String>> checkConflicts(@RequestBody Schedule schedule) {
         return Result.success(scheduleService.checkConflicts(schedule));
+    }
+
+    @Operation(summary = "查询赛程参赛人员")
+    @GetMapping("/{id}/participants")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<List<RegistrationVO>> listParticipants(@PathVariable Long id) {
+        return Result.success(scheduleService.listScheduleParticipants(id));
+    }
+
+    @Operation(summary = "保存赛程参赛人员安排")
+    @PutMapping("/{id}/participants")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Void> assignParticipants(@PathVariable Long id,
+                                           @RequestBody ScheduleParticipantDTO dto) {
+        scheduleService.assignScheduleParticipants(id, dto.getRegistrationIds());
+        return Result.success();
     }
 
     @Operation(summary = "创建赛程")

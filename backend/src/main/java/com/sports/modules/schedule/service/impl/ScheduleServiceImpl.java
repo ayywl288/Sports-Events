@@ -10,10 +10,13 @@ import com.sports.modules.event.entity.Event;
 import com.sports.modules.event.service.EventService;
 import com.sports.modules.registration.entity.Registration;
 import com.sports.modules.registration.service.RegistrationService;
+import com.sports.modules.registration.vo.RegistrationVO;
 import com.sports.modules.result.entity.CompetitionResult;
 import com.sports.modules.result.mapper.CompetitionResultMapper;
 import com.sports.modules.schedule.entity.Schedule;
+import com.sports.modules.schedule.entity.ScheduleParticipant;
 import com.sports.modules.schedule.mapper.ScheduleMapper;
+import com.sports.modules.schedule.mapper.ScheduleParticipantMapper;
 import com.sports.modules.schedule.service.ScheduleService;
 import com.sports.modules.schedule.vo.ScheduleVO;
 import com.sports.modules.sportitem.entity.SportItem;
@@ -32,6 +35,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +67,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     private final CompetitionResultMapper competitionResultMapper;
     private final RegistrationService registrationService;
     private final SysUserService sysUserService;
+    private final ScheduleParticipantMapper scheduleParticipantMapper;
 
     @Override
     public IPage<ScheduleVO> pageSchedulesVO(Integer current, Integer size, Long eventId, String matchDate) {
@@ -135,6 +141,11 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         if (Objects.equals(existing.getStatus(), STATUS_COMPLETED)) {
             throw new BusinessException("已结束的赛程不能修改");
         }
+        boolean itemChanged = !Objects.equals(existing.getEventId(), schedule.getEventId())
+                || !Objects.equals(existing.getSportItemId(), schedule.getSportItemId());
+        if (itemChanged && !participantRegistrationIds(id).isEmpty()) {
+            throw new BusinessException("该赛程已有选手安排，不能修改所属赛事或运动项目，请先清空选手安排");
+        }
 
         validate(schedule, id);
 
@@ -159,6 +170,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         if (resultCount > 0) {
             throw new BusinessException("该赛程下已录入成绩，不能删除");
         }
+        scheduleParticipantMapper.deleteByScheduleId(id);
         this.removeById(id);
     }
 
@@ -200,8 +212,8 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         if (schedule.getEventId() == null || schedule.getSportItemId() == null) {
             throw new BusinessException(ResultCode.PARAM_MISSING, "所属赛事与运动项目不能为空");
         }
-        if (schedule.getMatchDate() == null || schedule.getStartTime() == null) {
-            throw new BusinessException(ResultCode.PARAM_MISSING, "比赛日期与开始时间不能为空");
+        if (schedule.getMatchDate() == null || schedule.getStartTime() == null || schedule.getEndTime() == null) {
+            throw new BusinessException(ResultCode.PARAM_MISSING, "比赛日期、开始时间与结束时间不能为空");
         }
 
         Event event = eventService.getById(schedule.getEventId());
@@ -228,10 +240,8 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             throw new BusinessException("比赛日期不能晚于赛事结束日期");
         }
 
-        // 时间先后顺序
-        LocalTime start = schedule.getStartTime();
-        LocalTime end = schedule.getEndTime();
-        if (end != null && !end.isAfter(start)) {
+        // 时间先后顺序（起止时间均必填）
+        if (!schedule.getEndTime().isAfter(schedule.getStartTime())) {
             throw new BusinessException("结束时间必须晚于开始时间");
         }
 
@@ -245,11 +255,11 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     @Override
     public List<String> checkConflicts(Schedule schedule) {
         if (schedule.getEventId() == null || schedule.getSportItemId() == null
-                || schedule.getMatchDate() == null || schedule.getStartTime() == null) {
-            throw new BusinessException(ResultCode.PARAM_MISSING, "请先选择赛事、项目、比赛日期与开始时间");
+                || schedule.getMatchDate() == null || schedule.getStartTime() == null
+                || schedule.getEndTime() == null) {
+            throw new BusinessException(ResultCode.PARAM_MISSING, "请先选择赛事、项目、比赛日期以及完整的起止时间");
         }
-        LocalTime end = schedule.getEndTime();
-        if (end != null && !end.isAfter(schedule.getStartTime())) {
+        if (!schedule.getEndTime().isAfter(schedule.getStartTime())) {
             throw new BusinessException("结束时间必须晚于开始时间");
         }
         return collectConflicts(schedule, schedule.getId());
@@ -268,7 +278,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             }
         }
 
-        conflicts.addAll(findPlayerConflicts(schedule, excludeId));
+        conflicts.addAll(findPlayerConflicts(schedule, participantRegistrationIds(excludeId), excludeId));
 
         if (schedule.getRoundNo() != null) {
             long duplicate = this.count(new LambdaQueryWrapper<Schedule>()
@@ -285,67 +295,158 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         return conflicts;
     }
 
+    @Override
+    public List<RegistrationVO> listScheduleParticipants(Long scheduleId) {
+        Schedule schedule = this.getById(scheduleId);
+        if (schedule == null) {
+            throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
+        }
+        Set<Long> assignedIds = new HashSet<>(participantRegistrationIds(scheduleId));
+        if (assignedIds.isEmpty()) {
+            return List.of();
+        }
+        return registrationService.listParticipants(schedule.getEventId(), schedule.getSportItemId())
+                .stream()
+                .filter(participant -> assignedIds.contains(participant.getId()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignScheduleParticipants(Long scheduleId, List<Long> registrationIds) {
+        Schedule schedule = this.getById(scheduleId);
+        if (schedule == null) {
+            throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
+        }
+        if (Objects.equals(schedule.getStatus(), STATUS_COMPLETED)) {
+            throw new BusinessException("已结束的赛程不能调整参赛人员");
+        }
+
+        List<Long> ids = registrationIds == null ? List.of()
+                : registrationIds.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
+
+        if (!ids.isEmpty()) {
+            List<Registration> registrations = registrationService.listByIds(ids);
+            if (registrations.size() != ids.size()) {
+                throw new BusinessException(ResultCode.REGISTRATION_NOT_FOUND, "存在无效的报名记录");
+            }
+            for (Registration registration : registrations) {
+                if (!Objects.equals(registration.getStatus(), REGISTRATION_APPROVED)) {
+                    throw new BusinessException(ResultCode.PARAM_ERROR, "只能安排已通过审核的报名人员");
+                }
+                if (!Objects.equals(registration.getEventId(), schedule.getEventId())
+                        || !Objects.equals(registration.getSportItemId(), schedule.getSportItemId())) {
+                    throw new BusinessException(ResultCode.PARAM_ERROR, "报名人员不属于该赛程的赛事或运动项目");
+                }
+            }
+
+            List<String> conflicts = findPlayerConflicts(schedule, ids, scheduleId);
+            if (!conflicts.isEmpty()) {
+                throw new BusinessException(ResultCode.SCHEDULE_CONFLICT, String.join("；", conflicts));
+            }
+        }
+
+        // 整场替换：先物理删除旧安排，再写入新名单
+        scheduleParticipantMapper.deleteByScheduleId(scheduleId);
+        for (Long registrationId : ids) {
+            ScheduleParticipant participant = new ScheduleParticipant();
+            participant.setScheduleId(scheduleId);
+            participant.setRegistrationId(registrationId);
+            scheduleParticipantMapper.insert(participant);
+        }
+    }
+
     /**
-     * 选手冲突：本场项目的参赛选手，在同一时间已参加其他项目
+     * 查询某场赛程已安排的报名ID
      */
-    private List<String> findPlayerConflicts(Schedule schedule, Long excludeId) {
-        if (schedule.getMatchDate() == null || schedule.getStartTime() == null) {
+    private List<Long> participantRegistrationIds(Long scheduleId) {
+        if (scheduleId == null) {
+            return List.of();
+        }
+        return scheduleParticipantMapper.selectList(new LambdaQueryWrapper<ScheduleParticipant>()
+                        .eq(ScheduleParticipant::getScheduleId, scheduleId))
+                .stream()
+                .map(ScheduleParticipant::getRegistrationId)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 选手冲突：按「赛程参赛人员」名单，检查选手在同一时段是否已被安排其他场次
+     *
+     * @param schedule           待保存/待安排的赛程时间
+     * @param registrationIds    本场选手报名ID
+     * @param excludeScheduleId  排除当前赛程自身
+     */
+    private List<String> findPlayerConflicts(Schedule schedule, List<Long> registrationIds, Long excludeScheduleId) {
+        if (registrationIds == null || registrationIds.isEmpty()
+                || schedule.getMatchDate() == null || schedule.getStartTime() == null) {
             return List.of();
         }
 
-        // 本场参赛选手（已通过报名）
-        List<Registration> participants = registrationService.list(new LambdaQueryWrapper<Registration>()
-                .eq(Registration::getEventId, schedule.getEventId())
-                .eq(Registration::getSportItemId, schedule.getSportItemId())
-                .eq(Registration::getStatus, REGISTRATION_APPROVED));
-        if (participants.isEmpty()) {
+        List<Registration> assignedRegistrations = registrationService.listByIds(registrationIds);
+        Set<Long> userIds = assignedRegistrations.stream()
+                .filter(registration -> Objects.equals(registration.getStatus(), REGISTRATION_APPROVED))
+                .map(Registration::getUserId)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
             return List.of();
         }
 
-        Set<Long> userIds = participants.stream().map(Registration::getUserId).collect(Collectors.toSet());
-        List<Registration> otherRegistrations = registrationService.list(new LambdaQueryWrapper<Registration>()
+        // 这些选手名下的全部有效报名，用于找出他们被安排的其他场次
+        List<Registration> userRegistrations = registrationService.list(new LambdaQueryWrapper<Registration>()
                 .in(Registration::getUserId, userIds)
-                .eq(Registration::getStatus, REGISTRATION_APPROVED)
-                .ne(Registration::getSportItemId, schedule.getSportItemId()));
-        if (otherRegistrations.isEmpty()) {
+                .eq(Registration::getStatus, REGISTRATION_APPROVED));
+        if (userRegistrations.isEmpty()) {
             return List.of();
         }
 
-        Set<Long> eventIds = otherRegistrations.stream().map(Registration::getEventId).collect(Collectors.toSet());
-        Set<Long> itemIds = otherRegistrations.stream().map(Registration::getSportItemId).collect(Collectors.toSet());
+        Map<Long, Long> registrationUserMap = userRegistrations.stream()
+                .collect(Collectors.toMap(Registration::getId, Registration::getUserId, (left, right) -> left));
 
-        List<Schedule> sameDaySchedules = this.list(new LambdaQueryWrapper<Schedule>()
-                .in(Schedule::getEventId, eventIds)
-                .in(Schedule::getSportItemId, itemIds)
-                .eq(Schedule::getMatchDate, schedule.getMatchDate())
-                .ne(excludeId != null, Schedule::getId, excludeId));
-        if (sameDaySchedules.isEmpty()) {
+        List<ScheduleParticipant> assignments = scheduleParticipantMapper.selectList(
+                new LambdaQueryWrapper<ScheduleParticipant>()
+                        .in(ScheduleParticipant::getRegistrationId, registrationUserMap.keySet())
+                        .ne(excludeScheduleId != null, ScheduleParticipant::getScheduleId, excludeScheduleId));
+        if (assignments.isEmpty()) {
             return List.of();
         }
 
-        Map<String, List<Schedule>> pairScheduleMap = sameDaySchedules.stream()
-                .collect(Collectors.groupingBy(s -> pairKey(s.getEventId(), s.getSportItemId())));
-        Map<Long, String> itemNameMap = sportItemService.listByIds(itemIds).stream()
-                .collect(Collectors.toMap(SportItem::getId, SportItem::getName));
-        Map<Long, SysUser> userMap = sysUserService.listByIds(userIds).stream()
-                .collect(Collectors.toMap(SysUser::getId, Function.identity()));
+        Set<Long> otherScheduleIds = assignments.stream()
+                .map(ScheduleParticipant::getScheduleId)
+                .collect(Collectors.toSet());
+        Map<Long, Schedule> conflictSchedules = this.listByIds(otherScheduleIds).stream()
+                .filter(other -> other.getMatchDate() != null
+                        && other.getMatchDate().equals(schedule.getMatchDate())
+                        && isTimeOverlap(schedule.getStartTime(), schedule.getEndTime(),
+                        other.getStartTime(), other.getEndTime()))
+                .collect(Collectors.toMap(Schedule::getId, Function.identity(), (left, right) -> left));
+        if (conflictSchedules.isEmpty()) {
+            return List.of();
+        }
 
         Map<Long, Schedule> userConflicts = new LinkedHashMap<>();
-        for (Registration registration : otherRegistrations) {
-            List<Schedule> candidates = pairScheduleMap.get(pairKey(registration.getEventId(), registration.getSportItemId()));
-            if (candidates == null) {
+        for (ScheduleParticipant assignment : assignments) {
+            Schedule other = conflictSchedules.get(assignment.getScheduleId());
+            if (other == null) {
                 continue;
             }
-            for (Schedule candidate : candidates) {
-                if (isTimeOverlap(schedule.getStartTime(), schedule.getEndTime(), candidate.getStartTime(), candidate.getEndTime())) {
-                    userConflicts.putIfAbsent(registration.getUserId(), candidate);
-                    break;
-                }
+            Long userId = registrationUserMap.get(assignment.getRegistrationId());
+            if (userId != null) {
+                userConflicts.putIfAbsent(userId, other);
             }
         }
         if (userConflicts.isEmpty()) {
             return List.of();
         }
+
+        Set<Long> itemIds = userConflicts.values().stream()
+                .map(Schedule::getSportItemId)
+                .collect(Collectors.toSet());
+        Map<Long, String> itemNameMap = sportItemService.listByIds(itemIds).stream()
+                .collect(Collectors.toMap(SportItem::getId, SportItem::getName));
+        Map<Long, SysUser> userMap = sysUserService.listByIds(userIds).stream()
+                .collect(Collectors.toMap(SysUser::getId, Function.identity()));
 
         List<String> messages = new ArrayList<>();
         int index = 0;
@@ -374,29 +475,31 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             return List.of();
         }
 
-        Set<Long> eventIds = registrations.stream().map(Registration::getEventId).collect(Collectors.toSet());
-        Set<Long> itemIds = registrations.stream().map(Registration::getSportItemId).collect(Collectors.toSet());
-        Set<String> pairs = registrations.stream()
-                .map(registration -> pairKey(registration.getEventId(), registration.getSportItemId()))
+        Set<Long> registrationIds = registrations.stream()
+                .map(Registration::getId)
                 .collect(Collectors.toSet());
+        List<ScheduleParticipant> assignments = scheduleParticipantMapper.selectList(
+                new LambdaQueryWrapper<ScheduleParticipant>()
+                        .in(ScheduleParticipant::getRegistrationId, registrationIds));
+        if (assignments.isEmpty()) {
+            return List.of();
+        }
 
-        List<Schedule> schedules = this.list(new LambdaQueryWrapper<Schedule>()
-                .in(Schedule::getEventId, eventIds)
-                .in(Schedule::getSportItemId, itemIds)
-                .orderByAsc(Schedule::getMatchDate)
-                .orderByAsc(Schedule::getStartTime));
-
-        List<Schedule> mine = schedules.stream()
-                .filter(schedule -> pairs.contains(pairKey(schedule.getEventId(), schedule.getSportItemId())))
+        Set<Long> scheduleIds = assignments.stream()
+                .map(ScheduleParticipant::getScheduleId)
+                .collect(Collectors.toSet());
+        List<Schedule> schedules = this.listByIds(scheduleIds).stream()
+                .sorted(Comparator.comparing(Schedule::getMatchDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(Schedule::getStartTime, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
 
-        List<ScheduleVO> voList = convertToVOList(mine);
+        List<ScheduleVO> voList = convertToVOList(schedules);
         markScheduleConflicts(voList);
         return voList;
     }
 
     /**
-     * 标记个人日程之间的时间冲突（不同项目同一时段）
+     * 标记个人日程之间的时间冲突（同一时段被安排了多场）
      */
     private void markScheduleConflicts(List<ScheduleVO> schedules) {
         for (int i = 0; i < schedules.size(); i++) {
@@ -404,10 +507,6 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
                 ScheduleVO current = schedules.get(i);
                 ScheduleVO other = schedules.get(j);
                 if (current.getMatchDate() == null || !current.getMatchDate().equals(other.getMatchDate())) {
-                    continue;
-                }
-                // 同一项目的不同组别可并行进行，不视为个人冲突
-                if (Objects.equals(current.getSportItemId(), other.getSportItemId())) {
                     continue;
                 }
                 if (!isTimeOverlap(current.getStartTime(), current.getEndTime(), other.getStartTime(), other.getEndTime())) {
@@ -434,10 +533,6 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         LocalTime safeEnd1 = end1 != null ? end1 : start1;
         LocalTime safeEnd2 = end2 != null ? end2 : start2;
         return start1.isBefore(safeEnd2) && start2.isBefore(safeEnd1);
-    }
-
-    private String pairKey(Long eventId, Long sportItemId) {
-        return eventId + ":" + sportItemId;
     }
 
     private String scheduleLabel(Schedule schedule) {
