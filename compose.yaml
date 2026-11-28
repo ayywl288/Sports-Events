@@ -15,6 +15,7 @@ services:
       - ./backend/src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
       - ./docs/04-DB/fitness.sql:/docker-entrypoint-initdb.d/03-fitness.sql:ro
       - ./docs/04-DB/fitness-demo.sql:/docker-entrypoint-initdb.d/04-fitness-demo.sql:ro
+      - ./docs/04-DB/fitness_scoring.sql:/docker-entrypoint-initdb.d/05-fitness-scoring.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

@@ -52,9 +52,10 @@ docker compose up -d --build --wait
 - 赛事管理、运动项目配置、报名与审核、赛程安排、比赛成绩、公告和统计。
 - 管理员、教师、学生的独立工作台与菜单。后端根据登录角色返回对应的工作台摘要。
 - 管理员和教师在「体测管理」录入、修改和查询学生体测记录，并可按测试日期查看聚类。学生在「我的体测」查询本人历史记录。
+- 管理员和教师在「国标评分」按 2014 国标大学组录入、试算、保存和审核体测成绩；学生可在「体测成绩」查看本人已审核有效的成绩单。
 - K-Means 对 BMI、肺活量、50 米用时和立定跳远进行标准化后聚类。散点图可切换任意两项指标，并展示各组人数、四项中心值和相对当日样本的训练建议。新演示库有 36 名模拟学生的同日记录，可直接运行默认的三组分析。
 
-国家标准评分与等级、个人体测报告和趋势图仍在后续计划中。
+国标评分与个人体测成绩单已接入；体测趋势图仍在后续计划中。
 
 ## 本地开发（可选）
 
@@ -69,6 +70,7 @@ mysql --default-character-set=utf8mb4 -u root -p -e "source docs/04-DB/schema.sq
 mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source backend/src/main/resources/db/data.sql"
 mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source docs/04-DB/fitness.sql"
 mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source docs/04-DB/fitness-demo.sql"
+mysql --default-character-set=utf8mb4 -u root -p sports_events -e "source docs/04-DB/fitness_scoring.sql"
 ```
 
 打开一个终端，从项目根目录打包并启动后端。按需修改 MySQL 地址和账户。
