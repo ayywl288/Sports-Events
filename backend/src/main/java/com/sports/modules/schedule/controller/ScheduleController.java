@@ -9,11 +9,14 @@ import com.sports.modules.schedule.entity.Schedule;
 import com.sports.modules.schedule.service.ScheduleService;
 import com.sports.modules.schedule.service.impl.ScheduleServiceImpl;
 import com.sports.modules.schedule.vo.ScheduleVO;
+import com.sports.security.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 赛程 Controller
@@ -49,6 +52,19 @@ public class ScheduleController {
         org.springframework.beans.BeanUtils.copyProperties(schedule, vo);
         vo.setStatusName(ScheduleServiceImpl.getStatusName(schedule.getStatus()));
         return Result.success(vo);
+    }
+
+    @Operation(summary = "查询我的日程")
+    @GetMapping("/my")
+    public Result<List<ScheduleVO>> mySchedules() {
+        return Result.success(scheduleService.listSchedulesByUser(SecurityUtils.getUserId()));
+    }
+
+    @Operation(summary = "赛程冲突预检")
+    @PostMapping("/check-conflicts")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<List<String>> checkConflicts(@RequestBody Schedule schedule) {
+        return Result.success(scheduleService.checkConflicts(schedule));
     }
 
     @Operation(summary = "创建赛程")

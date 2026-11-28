@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.sports.modules.schedule.entity.Schedule;
 import com.sports.modules.schedule.vo.ScheduleVO;
 
+import java.util.List;
+
 /**
  * 赛程 Service
  *
@@ -46,4 +48,14 @@ public interface ScheduleService extends IService<Schedule> {
      * 完成比赛
      */
     void completeMatch(Long id);
+
+    /**
+     * 查询某个学生（已通过报名）的个人日程，并标记时间冲突
+     */
+    List<ScheduleVO> listSchedulesByUser(Long userId);
+
+    /**
+     * 预检赛程冲突（场地 / 选手 / 重复场次），返回冲突说明
+     */
+    List<String> checkConflicts(Schedule schedule);
 }

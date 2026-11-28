@@ -65,6 +65,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/schedule/list.vue'),
         meta: { title: '赛程安排', icon: 'Calendar' }
       },
+      {
+        path: 'my-schedules',
+        name: 'MySchedules',
+        component: () => import('@/views/schedule/my.vue'),
+        meta: { title: '我的日程', icon: 'Calendar', roles: ['STUDENT'] }
+      },
       // 成绩管理
       {
         path: 'results',

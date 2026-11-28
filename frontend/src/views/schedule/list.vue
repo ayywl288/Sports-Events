@@ -103,6 +103,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
+        <el-button :loading="checkLoading" @click="handleCheckConflicts">冲突检测</el-button>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
       </template>
@@ -135,6 +136,7 @@ const queryParams = reactive({
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const submitLoading = ref(false)
+const checkLoading = ref(false)
 const formRef = ref<FormInstance>()
 const editingId = ref<number | null>(null)
 
@@ -259,6 +261,38 @@ async function handleSubmit() {
       loadData()
     } finally {
       submitLoading.value = false
+    }
+  })
+}
+
+async function handleCheckConflicts() {
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    checkLoading.value = true
+    try {
+      const res = await post<string[]>('/schedules/check-conflicts', {
+        ...formData,
+        id: editingId.value
+      })
+      if (res.code === 200) {
+        const conflicts = res.data || []
+        if (!conflicts.length) {
+          ElMessage.success('未检测到场地或选手时间冲突')
+          return
+        }
+        ElMessageBox.alert(
+          conflicts.map((item, index) => `${index + 1}. ${item}`).join('<br/>'),
+          '检测到赛程冲突',
+          {
+            dangerouslyUseHTMLString: true,
+            type: 'warning',
+            confirmButtonText: '知道了'
+          }
+        )
+      }
+    } finally {
+      checkLoading.value = false
     }
   })
 }
